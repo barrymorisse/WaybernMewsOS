@@ -1,0 +1,138 @@
+{% extends "base.html" %}
+
+{% block content %}
+
+<a href="/meter-readings" class="text-sm text-gray-400 hover:text-gray-600 mb-6 inline-block">&larr; All readings</a>
+
+{% if error %}
+<div class="mb-6 bg-red-50 border border-red-200 text-red-700 text-sm rounded-lg px-4 py-3">
+  {{ error }}
+</div>
+{% endif %}
+
+<form method="post" action="{{ action }}" class="space-y-8 max-w-2xl">
+
+  <!-- Month / Year / Date -->
+  <div class="bg-white rounded-xl border border-gray-200 p-6 shadow-sm">
+    <h2 class="text-xs font-semibold text-gray-400 uppercase tracking-wide mb-4">Reading Period</h2>
+    <div class="grid grid-cols-3 gap-4">
+
+      <!-- Month — locked on edit, selectable on add -->
+      <div>
+        <label for="month" class="block text-xs font-semibold text-gray-500 uppercase tracking-wide mb-1">Month</label>
+        {% if reading and reading.year is not none and reading.year is not string %}
+          <!-- Editing: month is fixed -->
+          <p class="text-sm font-medium text-gray-700 py-2">{{ month_names[current_month] }}</p>
+          <input type="hidden" name="month" value="{{ current_month }}">
+        {% else %}
+          <select id="month" name="month"
+                  class="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500">
+            {% for i in range(1, 13) %}
+              <option value="{{ i }}" {% if i == current_month %}selected{% endif %}>{{ month_names[i] }}</option>
+            {% endfor %}
+          </select>
+        {% endif %}
+      </div>
+
+      <!-- Year — locked on edit, editable on add -->
+      <div>
+        <label for="year" class="block text-xs font-semibold text-gray-500 uppercase tracking-wide mb-1">Year</label>
+        {% if reading and reading.year is not none and reading.year is not string %}
+          <p class="text-sm font-medium text-gray-700 py-2">{{ current_year }}</p>
+          <input type="hidden" name="year" value="{{ current_year }}">
+        {% else %}
+          <input type="number" id="year" name="year"
+                 value="{{ current_year }}" min="2020" max="2099"
+                 class="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500">
+        {% endif %}
+      </div>
+
+      <!-- Reading date -->
+      <div>
+        <label for="reading_date" class="block text-xs font-semibold text-gray-500 uppercase tracking-wide mb-1">Reading Date</label>
+        <input type="date" id="reading_date" name="reading_date" required
+               value="{% if reading and reading.reading_date %}{{ reading.reading_date }}{% endif %}"
+               class="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500">
+      </div>
+
+    </div>
+  </div>
+
+  <!-- Electricity readings -->
+  <div class="bg-white rounded-xl border border-gray-200 p-6 shadow-sm">
+    <h2 class="text-xs font-semibold text-gray-400 uppercase tracking-wide mb-4">Electricity Readings <span class="text-gray-300 font-normal normal-case">kWh — cumulative meter values</span></h2>
+    <div class="grid grid-cols-2 gap-4">
+
+      {% set elec_fields = [
+        ("elec_unit_1", "Unit 1"),
+        ("elec_unit_2", "Unit 2"),
+        ("elec_unit_3", "Unit 3"),
+        ("elec_unit_4", "Unit 4"),
+        ("elec_unit_5", "Unit 5"),
+        ("elec_public_lighting", "Public Lighting"),
+        ("elec_total", "Total"),
+      ] %}
+
+      {% for field_name, label in elec_fields %}
+      <div>
+        <label for="{{ field_name }}" class="block text-xs font-semibold text-gray-500 uppercase tracking-wide mb-1">{{ label }}</label>
+        <div class="relative">
+          <input type="number" id="{{ field_name }}" name="{{ field_name }}"
+                 step="0.1" min="0"
+                 value="{% if reading %}{% if reading[field_name] is defined %}{{ reading[field_name] or '' }}{% elif reading | attr(field_name) is not none %}{{ reading | attr(field_name) }}{% endif %}{% endif %}"
+                 placeholder="—"
+                 class="w-full border border-gray-300 rounded-lg px-3 py-2 pr-12 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500">
+          <span class="absolute right-3 top-2 text-xs text-gray-400">kWh</span>
+        </div>
+      </div>
+      {% endfor %}
+
+    </div>
+  </div>
+
+  <!-- Water readings -->
+  <div class="bg-white rounded-xl border border-gray-200 p-6 shadow-sm">
+    <h2 class="text-xs font-semibold text-gray-400 uppercase tracking-wide mb-4">Water Readings <span class="text-gray-300 font-normal normal-case">kL — cumulative meter values</span></h2>
+    <div class="grid grid-cols-2 gap-4">
+
+      {% set water_fields = [
+        ("water_unit_1", "Unit 1"),
+        ("water_unit_2", "Unit 2"),
+        ("water_unit_3", "Unit 3"),
+        ("water_unit_4", "Unit 4"),
+        ("water_unit_5", "Unit 5"),
+        ("water_total", "Total"),
+      ] %}
+
+      {% for field_name, label in water_fields %}
+      <div>
+        <label for="{{ field_name }}" class="block text-xs font-semibold text-gray-500 uppercase tracking-wide mb-1">{{ label }}</label>
+        <div class="relative">
+          <input type="number" id="{{ field_name }}" name="{{ field_name }}"
+                 step="0.001" min="0"
+                 value="{% if reading %}{% if reading[field_name] is defined %}{{ reading[field_name] or '' }}{% elif reading | attr(field_name) is not none %}{{ reading | attr(field_name) }}{% endif %}{% endif %}"
+                 placeholder="—"
+                 class="w-full border border-gray-300 rounded-lg px-3 py-2 pr-8 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500">
+          <span class="absolute right-3 top-2 text-xs text-gray-400">kL</span>
+        </div>
+      </div>
+      {% endfor %}
+
+    </div>
+  </div>
+
+  <!-- Buttons -->
+  <div class="flex gap-3">
+    <button type="submit"
+            class="bg-blue-600 text-white text-sm font-medium px-5 py-2 rounded-lg hover:bg-blue-700 transition-colors">
+      Save reading
+    </button>
+    <a href="/meter-readings"
+       class="text-sm font-medium text-gray-500 hover:text-gray-700 px-5 py-2 rounded-lg border border-gray-200 hover:bg-gray-50 transition-colors">
+      Cancel
+    </a>
+  </div>
+
+</form>
+
+{% endblock %}

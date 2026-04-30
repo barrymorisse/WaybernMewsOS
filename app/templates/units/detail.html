@@ -1,0 +1,92 @@
+{% extends "base.html" %}
+
+{% block content %}
+
+<!-- Back link -->
+<a href="/units" class="text-sm text-gray-400 hover:text-gray-600 mb-6 inline-block">&larr; All units</a>
+
+<!-- Unit details card -->
+<div class="bg-white rounded-xl border border-gray-200 p-6 mb-6 shadow-sm">
+  <div class="flex items-start justify-between mb-4">
+    <h2 class="text-base font-semibold text-gray-700 uppercase tracking-wide text-xs">Unit Details</h2>
+    <a href="/units/{{ unit.id }}/edit"
+       class="text-sm text-blue-600 hover:text-blue-800 font-medium">Edit</a>
+  </div>
+
+  <div class="grid grid-cols-3 gap-4 text-sm">
+    <div>
+      <p class="text-xs text-gray-400 uppercase tracking-wide mb-1">Unit Number</p>
+      <p class="font-medium text-gray-900">{{ unit.unit_number }}</p>
+    </div>
+    <div>
+      <p class="text-xs text-gray-400 uppercase tracking-wide mb-1">Description</p>
+      <p class="text-gray-700">{{ unit.description or "—" }}</p>
+    </div>
+    <div>
+      <p class="text-xs text-gray-400 uppercase tracking-wide mb-1">Participation Quota</p>
+      <p class="text-gray-700">{{ "%.0f"|format(unit.participation_quota * 100) }}%</p>
+    </div>
+  </div>
+</div>
+
+<!-- Contacts card -->
+<div class="bg-white rounded-xl border border-gray-200 shadow-sm">
+  <div class="flex items-center justify-between px-6 py-4 border-b border-gray-100">
+    <h2 class="text-base font-semibold text-gray-700 uppercase tracking-wide text-xs">Contacts</h2>
+    <a href="/units/{{ unit.id }}/contacts/add"
+       class="text-sm text-blue-600 hover:text-blue-800 font-medium">+ Add contact</a>
+  </div>
+
+  {% if unit.contacts %}
+  <table class="w-full text-sm">
+    <thead class="bg-gray-50 border-b border-gray-100">
+      <tr>
+        <th class="text-left px-6 py-3 text-xs font-semibold text-gray-400 uppercase tracking-wide">Name</th>
+        <th class="text-left px-6 py-3 text-xs font-semibold text-gray-400 uppercase tracking-wide">Phone</th>
+        <th class="text-left px-6 py-3 text-xs font-semibold text-gray-400 uppercase tracking-wide">Email</th>
+        <th class="text-left px-6 py-3 text-xs font-semibold text-gray-400 uppercase tracking-wide">Roles</th>
+        <th class="px-6 py-3"></th>
+      </tr>
+    </thead>
+    <tbody class="divide-y divide-gray-50">
+      {% for contact in unit.contacts %}
+      <tr class="hover:bg-gray-50">
+        <td class="px-6 py-4 font-medium text-gray-900">{{ contact.name }}</td>
+        <td class="px-6 py-4 text-gray-500">{{ contact.phone or "—" }}</td>
+        <td class="px-6 py-4 text-gray-500">{{ contact.email or "—" }}</td>
+        <td class="px-6 py-4">
+          <div class="flex flex-wrap gap-1">
+            {% if contact.is_owner %}
+              <span class="text-xs font-medium bg-purple-50 text-purple-700 rounded-full px-2 py-0.5">Owner</span>
+            {% endif %}
+            {% if contact.is_tenant %}
+              <span class="text-xs font-medium bg-blue-50 text-blue-700 rounded-full px-2 py-0.5">Tenant</span>
+            {% endif %}
+            {% if contact.is_resident %}
+              <span class="text-xs font-medium bg-green-50 text-green-700 rounded-full px-2 py-0.5">Resident</span>
+            {% endif %}
+            {% if contact.is_trustee %}
+              <span class="text-xs font-medium bg-amber-50 text-amber-700 rounded-full px-2 py-0.5">Trustee</span>
+            {% endif %}
+          </div>
+        </td>
+        <td class="px-6 py-4 text-right whitespace-nowrap">
+          <a href="/units/{{ unit.id }}/contacts/{{ contact.id }}/edit"
+             class="text-sm text-blue-600 hover:text-blue-800 font-medium mr-4">Edit</a>
+          <!-- Delete uses a form so we can POST (browsers don't support DELETE natively) -->
+          <form method="post" action="/units/{{ unit.id }}/contacts/{{ contact.id }}/delete"
+                class="inline"
+                onsubmit="return confirm('Delete {{ contact.name }}? This cannot be undone.')">
+            <button type="submit" class="text-sm text-red-500 hover:text-red-700 font-medium">Delete</button>
+          </form>
+        </td>
+      </tr>
+      {% endfor %}
+    </tbody>
+  </table>
+  {% else %}
+  <p class="px-6 py-8 text-sm text-gray-400 text-center">No contacts yet. <a href="/units/{{ unit.id }}/contacts/add" class="text-blue-600 hover:underline">Add one.</a></p>
+  {% endif %}
+</div>
+
+{% endblock %}

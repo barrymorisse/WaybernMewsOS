@@ -1,0 +1,67 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>{{ page_title }} — Waybern Mews OS</title>
+
+  <!-- Tailwind CSS (utility-first styling, no build step required) -->
+  <script src="https://cdn.tailwindcss.com"></script>
+
+  <!-- HTMX (enables dynamic page updates without writing JavaScript) -->
+  <script src="https://unpkg.com/htmx.org@1.9.12"></script>
+</head>
+
+<body class="bg-gray-100 text-gray-900 h-screen flex">
+
+  <!-- ===== SIDEBAR ===== -->
+  <aside class="w-60 bg-gray-900 text-white flex flex-col flex-shrink-0">
+
+    <!-- App name / logo -->
+    <div class="px-5 py-6 border-b border-gray-700">
+      <p class="text-xs font-semibold uppercase tracking-widest text-gray-400 mb-1">Waybern Mews</p>
+      <p class="text-lg font-bold leading-tight">Operating System</p>
+    </div>
+
+    <!-- Navigation links — added here as each module is built -->
+    <nav class="flex-1 px-3 py-4">
+      <a href="/units"
+         class="flex items-center gap-3 px-3 py-2 rounded-lg text-sm text-gray-300 hover:bg-gray-800 hover:text-white transition-colors">
+        <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4 flex-shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+          <path stroke-linecap="round" stroke-linejoin="round" d="M3 12l2-2m0 0l7-7 7 7M5 10v10a1 1 0 001 1h3m10-11l2 2m-2-2v10a1 1 0 01-1 1h-3m-6 0a1 1 0 001-1v-4a1 1 0 011-1h2a1 1 0 011 1v4a1 1 0 001 1m-6 0h6" />
+        </svg>
+        Units &amp; Owners
+      </a>
+      <a href="/meter-readings"
+         class="flex items-center gap-3 px-3 py-2 rounded-lg text-sm text-gray-300 hover:bg-gray-800 hover:text-white transition-colors mt-1">
+        <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4 flex-shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+          <path stroke-linecap="round" stroke-linejoin="round" d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z" />
+        </svg>
+        Meter Readings
+      </a>
+    </nav>
+
+    <!-- Version footer -->
+    <div class="px-5 py-4 border-t border-gray-700">
+      <p class="text-xs text-gray-500">v0.1 — Module 2a</p>
+    </div>
+
+  </aside>
+
+  <!-- ===== MAIN AREA ===== -->
+  <div class="flex-1 flex flex-col overflow-hidden">
+
+    <!-- Top header bar -->
+    <header class="bg-white border-b border-gray-200 px-8 py-4 flex items-center">
+      <h1 class="text-xl font-semibold text-gray-800">{{ page_title }}</h1>
+    </header>
+
+    <!-- Page content — each template fills this block -->
+    <main class="flex-1 overflow-y-auto px-8 py-8">
+      {% block content %}{% endblock %}
+    </main>
+
+  </div>
+
+</body>
+</html>

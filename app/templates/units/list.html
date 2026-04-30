@@ -1,0 +1,42 @@
+{% extends "base.html" %}
+
+{% block content %}
+
+<div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
+  {% for unit in units %}
+
+    {# Determine occupancy status from contacts #}
+    {% set has_tenant = unit.contacts | selectattr("is_tenant") | list | length > 0 %}
+    {% set owner_names = unit.contacts | selectattr("is_owner") | map(attribute="name") | list %}
+
+    <a href="/units/{{ unit.id }}"
+       class="bg-white rounded-xl border border-gray-200 p-6 flex flex-col gap-3 shadow-sm hover:shadow-md hover:border-gray-300 transition-all">
+
+      <!-- Unit number -->
+      <div class="flex items-start justify-between">
+        <h2 class="text-lg font-bold text-gray-900">Unit {{ unit.unit_number }}</h2>
+
+        <!-- Occupancy badge -->
+        {% if has_tenant %}
+          <span class="text-xs font-medium text-blue-700 bg-blue-50 rounded-full px-3 py-1 whitespace-nowrap">Tenant-occupied</span>
+        {% else %}
+          <span class="text-xs font-medium text-green-700 bg-green-50 rounded-full px-3 py-1 whitespace-nowrap">Owner-occupied</span>
+        {% endif %}
+      </div>
+
+      <!-- Owner name(s) -->
+      <p class="text-sm text-gray-600">
+        <span class="font-medium text-gray-500 uppercase tracking-wide text-xs">Owner</span><br>
+        {{ owner_names | join(", ") if owner_names else "—" }}
+      </p>
+
+      <!-- Resident count -->
+      {% set resident_count = unit.contacts | selectattr("is_resident") | list | length %}
+      <p class="text-xs text-gray-400">{{ resident_count }} resident{{ "s" if resident_count != 1 }}</p>
+
+    </a>
+
+  {% endfor %}
+</div>
+
+{% endblock %}
