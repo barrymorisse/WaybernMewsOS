@@ -12,9 +12,14 @@ from fastapi.templating import Jinja2Templates
 from contextlib import asynccontextmanager
 import os
 
+from dotenv import load_dotenv
+load_dotenv()  # Load GROQ_API_KEY and any other secrets from .env
+
 from app.database import init_db
 from app.routers import units as units_router
 from app.routers import meter_readings as meter_readings_router
+from app.routers import coj_invoices as coj_invoices_router
+from app.routers import complex_info as complex_info_router
 
 
 @asynccontextmanager
@@ -41,6 +46,8 @@ templates = Jinja2Templates(
 # Register module routers
 app.include_router(units_router.router)
 app.include_router(meter_readings_router.router)
+app.include_router(coj_invoices_router.router)
+app.include_router(complex_info_router.router)
 
 
 @app.get("/")

@@ -17,6 +17,8 @@ The stack is deliberately minimal. Every technology choice was made to reduce co
 | Framework | **FastAPI** | Fast, modern, excellent for building APIs and serving HTML. Auto-generates API docs. Well-supported by coding agents. |
 | Database | **SQLite** (via SQLAlchemy ORM) | Zero infrastructure, single file, offline, free. More than sufficient for 5 units. |
 | PDF parsing | **pypdf** | Used to parse City of Joburg utility bills (existing proven pattern) |
+| LLM extraction | **Groq API** (`groq` Python library, `llama-3.3-70b-versatile`, temperature=0) | Interprets pypdf raw text into structured JSON. Free tier sufficient for ~2 invoices/month. Can be swapped for Claude API if accuracy becomes insufficient. |
+| Environment secrets | **python-dotenv** | Loads `GROQ_API_KEY` and other secrets from `.env` file at startup. `.env` is gitignored. |
 | Document generation | **WeasyPrint** or **Jinja2 + HTML→PDF** | For generating levy notices, meeting minutes, financial reports as PDFs |
 | Email | **Gmail SMTP** (via Python `smtplib`) | Free, uses existing complex Gmail account, no third-party service needed |
 
@@ -83,9 +85,26 @@ The server runs persistently in the background until the Mac is rebooted. There 
 
 ---
 
+## Document Repository
+
+Uploaded files that form part of the complex's records are stored in `documents/` within the project directory, organised by type:
+
+```
+documents/
+  invoices/       ← CoJ electricity and water PDFs (gitignored)
+```
+
+PDF filenames are deterministic: `{invoice_type}_{year}_{month:02d}.pdf` (e.g. `electricity_2026_04.pdf`). This allows duplicate uploads to overwrite cleanly without orphaned files. The path relative to the project root is stored in the relevant DB record.
+
+Saved PDFs are served back to the browser via FastAPI's `FileResponse` (`GET /coj-invoices/{id}/pdf`), which streams the file inline with `media_type="application/pdf"` so it opens directly in the browser tab rather than forcing a download.
+
+---
+
 ## LLM / AI Usage
 
-LLM calls are reserved for tasks where they provide irreplaceable value.
+LLM calls are reserved for tasks where they provide irreplaceable value. Current usage:
+
+- **Module 2b:** Groq API (`llama-3.3-70b-versatile`) parses CoJ invoice PDF text into structured JSON. pypdf handles text extraction; the LLM handles interpretation. Temperature is set to 0 for deterministic output.
 
 ---
 

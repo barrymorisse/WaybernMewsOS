@@ -9,7 +9,6 @@ import calendar
 from datetime import date
 from fastapi import HTTPException
 from sqlalchemy.orm import Session
-from sqlalchemy.exc import IntegrityError
 
 from app.models.meter_readings import MeterReading
 

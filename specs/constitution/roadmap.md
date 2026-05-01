@@ -56,7 +56,7 @@ A registry of all 5 units and every person associated with them.
 ---
 
 ## Module 2: Utility Billing
-**Status:** 🔄 In progress — broken into sub-modules (2a → 2b → 2c)
+**Status:** 🔄 In progress — broken into sub-modules (2a ✅ → 2b ✅ → 2c 💡)
 
 The full utility billing workflow, built incrementally. Each sub-module is a standalone deliverable that feeds into the next.
 
@@ -77,29 +77,49 @@ Manual entry and storage of all monthly meter readings taken by Barry at the com
 
 ---
 
-### Module 2b: Utility Consumption & Allocation
-**Status:** 💡 Planned
+### Module 2b: CoJ Bill Parsing
+**Status:** ✅ Complete  
+**Spec:** `/specs/features/module_2b_coj_bill_parsing/`
 
-Calculate per-unit consumption from stored readings and allocate costs proportionally.
+Parse the City of Joburg bulk utility bill PDFs to extract the rand amounts and meter readings to be used in consumption calculations and billing. Both Phase 1 (parse and display) and Phase 2 (save to DB) are complete.
 
 **Includes:**
-- Consumption calculation (this month − last month per meter)
-- Common property derivation (total − sum of units)
-- Proportional allocation to each unit based on participation quota
-- Review screen before finalising
+- PDF upload UI (electricity and water & sanitation handled separately, same upload form)
+- Automated extraction via pypdf + Groq LLM (llama-3.3-70b-versatile, temperature=0)
+- Extraction of reading dates, start/end readings, step charges (usage + rate per step), fixed charges, VAT, total due
+- Six-check validation suite: invoice totals, account number, meter number, consumption arithmetic, step usage sum, VAT rate
+- Auto-save to DB and PDF storage in `documents/invoices/` when all error checks pass
+- Duplicate detection with overwrite confirmation UI (side-by-side comparison of existing vs. new)
+- Billing period columns (`billing_year`, `billing_month`) stored on every invoice for future join to meter readings — always one month behind the statement date
+- Complex Info settings page (`/complex-info`) for storing and editing reference data (account numbers, meter numbers) used in validation — extensible as more reference data is needed
+- DB record panel in results view showing exact rows written to `coj_invoices` and `coj_invoice_line_items`
+- Saved invoices history list on the CoJ Invoices page (type, statement month, billing period, invoice number, total due, save date); auto-refreshes after each save via HTMX
+- PDF viewer: saved PDFs accessible directly from the history list, opening inline in a new browser tab
 
 ---
 
-### Module 2c: CoJ Bill Parsing
+### Module 2c: Utility Consumption & Allocation
 **Status:** 💡 Planned
 
-Parse the City of Joburg bulk utility bill PDF to extract the rand amounts to be allocated.
+Calculate per-unit consumption from stored readings, reconcile against the CoJ invoice, and produce grossed-up figures for billing.
 
-**Includes:**
-- PDF upload
-- Automated extraction of water, electricity, sewage, refuse line items (pypdf + LLM fallback)
-- Link extracted charges to the corresponding month's meter readings
-- Utility invoice generation per unit (PDF)
+**Data model (already built by Module 2b):**
+- `coj_invoices` table stores one row per invoice (electricity and water), keyed by `invoice_type + statement_year + statement_month`
+- `billing_year` and `billing_month` on each invoice are one month behind the statement date — this is the join key to `meter_readings`
+- e.g. a March 2026 invoice (`statement_month=3`) has `billing_month=2`, linking it to the February 2026 meter readings
+- CoJ reading dates differ from Barry's reading dates — no hard FK; join is by year + month
+
+**Calculation logic (to be built into the UI):**
+- Our unit consumption (elec & water): `this month reading − last month reading`
+- Our common property elec: `elec_total_usage − sum(unit 1–5 elec usage)` — public lighting stored for reference only, not used in this calculation
+- Our common property water: `water_total_usage − sum(unit 1–5 water usage)`
+- CoJ total usage: derived from CoJ readings the same way
+- Gross-up factor: `coj_total_usage ÷ our_total_usage` (one factor for elec, one for water)
+- Grossed-up figure per unit/common property: `raw_usage × gross-up factor` — applied uniformly, not per-unit
+
+**UI (to be built):**
+- Review screen showing: raw usage, gross-up factor, and grossed-up figures per unit + common property
+- Confirm to finalise (feeds into levy/utility billing)
 
 ---
 
@@ -249,3 +269,9 @@ Tracking of the complex's insurance policy: insurer, policy number, renewal date
 | Date | Change | Updated by |
 |------|--------|-----------|
 | 2026-04-30 | Initial roadmap created | Barry + Claude |
+| 2026-04-30 | Module 2a marked complete; historical readings imported; decimal precision updated to 4dp | Barry + Claude |
+| 2026-04-30 | Module 2b data model revised: CoJ data to live in separate `coj_invoices` table, not on `meter_readings` | Barry + Claude |
+| 2026-04-30 | Modules 2b and 2c swapped: CoJ PDF parsing now precedes consumption calculations | Barry + Claude |
+| 2026-04-30 | Module 2b spec written; folder renamed to `module_2b_coj_bill_parsing` to match naming convention | Barry + Claude |
+| 2026-05-01 | Module 2b complete: parsing, 6-check validation suite, auto-save, PDF storage, duplicate handling, Complex Info settings page | Barry + Claude |
+| 2026-05-01 | Module 2b extended: invoice history list + PDF viewer added to CoJ Invoices page | Barry + Claude |

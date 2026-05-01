@@ -78,7 +78,7 @@
         <label for="{{ field_name }}" class="block text-xs font-semibold text-gray-500 uppercase tracking-wide mb-1">{{ label }}</label>
         <div class="relative">
           <input type="number" id="{{ field_name }}" name="{{ field_name }}"
-                 step="0.1" min="0"
+                 step="0.0001" min="0"
                  value="{% if reading %}{% if reading[field_name] is defined %}{{ reading[field_name] or '' }}{% elif reading | attr(field_name) is not none %}{{ reading | attr(field_name) }}{% endif %}{% endif %}"
                  placeholder="—"
                  class="w-full border border-gray-300 rounded-lg px-3 py-2 pr-12 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500">
@@ -109,7 +109,7 @@
         <label for="{{ field_name }}" class="block text-xs font-semibold text-gray-500 uppercase tracking-wide mb-1">{{ label }}</label>
         <div class="relative">
           <input type="number" id="{{ field_name }}" name="{{ field_name }}"
-                 step="0.001" min="0"
+                 step="0.0001" min="0"
                  value="{% if reading %}{% if reading[field_name] is defined %}{{ reading[field_name] or '' }}{% elif reading | attr(field_name) is not none %}{{ reading | attr(field_name) }}{% endif %}{% endif %}"
                  placeholder="—"
                  class="w-full border border-gray-300 rounded-lg px-3 py-2 pr-8 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500">

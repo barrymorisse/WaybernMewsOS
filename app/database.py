@@ -7,7 +7,7 @@ get_db(), a dependency used in FastAPI routes to open and close database
 sessions safely.
 """
 
-from sqlalchemy import create_engine
+from sqlalchemy import create_engine, text
 from sqlalchemy.ext.declarative import declarative_base
 from sqlalchemy.orm import sessionmaker
 import os
@@ -42,14 +42,43 @@ def get_db():
         db.close()
 
 
+def _apply_migrations():
+    """
+    Apply schema changes that SQLAlchemy's create_all won't handle automatically.
+    Each statement is wrapped in try/except so it is safe to run on every startup.
+    """
+    add_columns = [
+        ("coj_invoices",     "billing_year",             "INTEGER"),
+        ("coj_invoices",     "billing_month",            "INTEGER"),
+        ("coj_invoices",     "pdf_path",                 "VARCHAR"),
+        ("complex_settings", "electricity_meter_number", "VARCHAR"),
+        ("complex_settings", "water_meter_number",       "VARCHAR"),
+    ]
+    drop_columns = [
+        ("coj_invoices", "meter_number"),
+    ]
+    with engine.connect() as conn:
+        for table, column, typedef in add_columns:
+            try:
+                conn.execute(text(f"ALTER TABLE {table} ADD COLUMN {column} {typedef}"))
+                conn.commit()
+            except Exception:
+                pass  # Column already exists
+        for table, column in drop_columns:
+            try:
+                conn.execute(text(f"ALTER TABLE {table} DROP COLUMN {column}"))
+                conn.commit()
+            except Exception:
+                pass  # Column already removed or never existed
+
+
 def init_db():
     """
     Creates all database tables defined by models that have imported Base.
     Called once on application startup. Safe to call multiple times —
     SQLAlchemy only creates tables that don't already exist.
     """
-    # Import models here so SQLAlchemy knows about them before calling create_all.
-    # As new modules are added, import their models here.
     import app.models  # noqa: F401
 
     Base.metadata.create_all(bind=engine)
+    _apply_migrations()

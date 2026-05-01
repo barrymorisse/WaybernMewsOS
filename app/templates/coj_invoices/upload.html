@@ -1,0 +1,99 @@
+{% extends "base.html" %}
+
+{% block content %}
+
+{# ── Upload form ── #}
+<div class="max-w-2xl mb-8">
+
+  <p class="text-gray-500 text-sm mb-6">
+    Upload a City of Johannesburg invoice PDF. If all validation checks pass, the data is saved automatically.
+  </p>
+
+  <div class="bg-white rounded-xl border border-gray-200 p-6 shadow-sm">
+    <form
+      hx-post="/coj-invoices/parse"
+      hx-target="#results-area"
+      hx-swap="innerHTML"
+      hx-encoding="multipart/form-data"
+      hx-indicator="#spinner"
+    >
+
+      <!-- Invoice type toggle -->
+      <fieldset class="mb-6">
+        <legend class="block text-sm font-medium text-gray-700 mb-3">Invoice type</legend>
+        <div class="flex gap-3">
+          <label class="flex-1">
+            <input type="radio" name="invoice_type" value="electricity" class="sr-only peer" checked />
+            <span class="block text-center py-2.5 px-4 rounded-lg border-2 border-gray-200 text-sm font-medium text-gray-600 cursor-pointer
+                         peer-checked:border-yellow-400 peer-checked:bg-yellow-50 peer-checked:text-yellow-800
+                         hover:border-gray-300 transition-colors">
+              ⚡ Electricity
+            </span>
+          </label>
+          <label class="flex-1">
+            <input type="radio" name="invoice_type" value="water" class="sr-only peer" />
+            <span class="block text-center py-2.5 px-4 rounded-lg border-2 border-gray-200 text-sm font-medium text-gray-600 cursor-pointer
+                         peer-checked:border-blue-400 peer-checked:bg-blue-50 peer-checked:text-blue-800
+                         hover:border-gray-300 transition-colors">
+              💧 Water &amp; Sanitation
+            </span>
+          </label>
+        </div>
+      </fieldset>
+
+      <!-- File input -->
+      <div class="mb-6">
+        <label for="pdf_file" class="block text-sm font-medium text-gray-700 mb-2">PDF file</label>
+        <input
+          type="file"
+          id="pdf_file"
+          name="pdf_file"
+          accept=".pdf"
+          required
+          class="block w-full text-sm text-gray-600
+                 file:mr-4 file:py-2 file:px-4 file:rounded-lg file:border-0
+                 file:text-sm file:font-medium file:bg-gray-100 file:text-gray-700
+                 hover:file:bg-gray-200 file:cursor-pointer cursor-pointer"
+        />
+      </div>
+
+      <!-- Submit -->
+      <div class="flex items-center gap-4">
+        <button
+          type="submit"
+          class="px-5 py-2.5 bg-gray-900 text-white text-sm font-medium rounded-lg hover:bg-gray-700 transition-colors"
+        >
+          Extract Invoice
+        </button>
+
+        <div id="spinner" class="htmx-indicator flex items-center gap-2 text-sm text-gray-500">
+          <svg class="animate-spin h-4 w-4 text-gray-500" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+            <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
+            <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z"></path>
+          </svg>
+          Parsing invoice…
+        </div>
+      </div>
+
+    </form>
+  </div>
+
+  <!-- Results area — populated by HTMX after upload -->
+  <div id="results-area" class="mt-6"></div>
+
+</div>
+
+{# ── Saved invoices list ── #}
+<div class="bg-white rounded-xl border border-gray-200 shadow-sm">
+  <div class="px-6 py-4 border-b border-gray-100">
+    <h2 class="text-sm font-semibold text-gray-700 uppercase tracking-wide">Saved Invoices</h2>
+  </div>
+  <div id="saved-invoices"
+       hx-get="/coj-invoices/list"
+       hx-trigger="invoiceSaved from:body"
+       hx-swap="innerHTML">
+    {% include "coj_invoices/_invoice_list.html" %}
+  </div>
+</div>
+
+{% endblock %}
