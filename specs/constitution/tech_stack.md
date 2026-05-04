@@ -92,11 +92,16 @@ Uploaded files that form part of the complex's records are stored in `documents/
 ```
 documents/
   invoices/       ← CoJ electricity and water PDFs (gitignored)
+  insurance/      ← Insurance policy PDFs (gitignored)
 ```
 
-PDF filenames are deterministic: `{invoice_type}_{year}_{month:02d}.pdf` (e.g. `electricity_2026_04.pdf`). This allows duplicate uploads to overwrite cleanly without orphaned files. The path relative to the project root is stored in the relevant DB record.
+All document folders are gitignored — uploaded PDFs are sensitive records that must never be committed to GitHub. The SQLite database (`data/waybern.db`) is also gitignored. Both live locally and are synced to cloud via Google Drive only.
 
-Saved PDFs are served back to the browser via FastAPI's `FileResponse` (`GET /coj-invoices/{id}/pdf`), which streams the file inline with `media_type="application/pdf"` so it opens directly in the browser tab rather than forcing a download.
+CoJ invoice filenames are deterministic: `{invoice_type}_{year}_{month:02d}.pdf` (e.g. `electricity_2026_04.pdf`). This allows duplicate uploads to overwrite cleanly without orphaned files.
+
+Insurance PDF filenames include a timestamp to prevent collisions: `{policy_id}_{document_type}_{timestamp}_{original_stem}.pdf`.
+
+The path relative to the project root is stored in the relevant DB record. Saved PDFs are served back to the browser via FastAPI's `FileResponse`, which streams the file inline with `media_type="application/pdf"` so it opens directly in the browser tab rather than forcing a download.
 
 ---
 
@@ -105,6 +110,7 @@ Saved PDFs are served back to the browser via FastAPI's `FileResponse` (`GET /co
 LLM calls are reserved for tasks where they provide irreplaceable value. Current usage:
 
 - **Module 2b:** Groq API (`llama-3.3-70b-versatile`) parses CoJ invoice PDF text into structured JSON. pypdf handles text extraction; the LLM handles interpretation. Temperature is set to 0 for deterministic output.
+- **Module 11:** Groq API (`llama-3.3-70b-versatile`) is used for two tasks: (1) extracting a structured key facts summary (insurer, cover dates, premium, main covers, key exclusions, excess, emergency contact, broker) from each uploaded insurance document — one call per upload; (2) answering plain-language questions about the policy documents, with page-level citations — one call per question. Context is the full concatenated extracted text of all documents linked to the policy (~64k tokens estimated). Temperature is set to 0. Fallback: Claude Haiku (`claude-haiku-4-5`) via `ANTHROPIC_API_KEY` if Groq free-tier rate limits are hit — a one-line swap in `app/services/insurance_service.py`.
 
 ---
 

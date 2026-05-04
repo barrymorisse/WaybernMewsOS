@@ -1,0 +1,65 @@
+<!-- Inline form for creating a new insurance policy -->
+<div class="bg-white rounded-xl border border-blue-200 p-6 shadow-sm">
+  <h3 class="text-sm font-semibold text-gray-800 mb-4">New Insurance Policy</h3>
+  <form method="post" action="/insurance/policies">
+    <div class="grid grid-cols-2 gap-4">
+
+      <div class="col-span-2">
+        <label class="block text-xs font-medium text-gray-600 mb-1">Label <span class="text-red-500">*</span></label>
+        <input type="text" name="label" required placeholder="e.g. 2026–2027 Renewal"
+               class="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500" />
+      </div>
+
+      <div>
+        <label class="block text-xs font-medium text-gray-600 mb-1">Insurer</label>
+        <input type="text" name="insurer_name" placeholder="e.g. Hollard Insurance"
+               class="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500" />
+      </div>
+
+      <div>
+        <label class="block text-xs font-medium text-gray-600 mb-1">Policy Number</label>
+        <input type="text" name="policy_number" placeholder="e.g. POL-2026-00123"
+               class="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500" />
+      </div>
+
+      <div>
+        <label class="block text-xs font-medium text-gray-600 mb-1">Cover Start Date</label>
+        <input type="date" name="cover_start_date"
+               class="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500" />
+      </div>
+
+      <div>
+        <label class="block text-xs font-medium text-gray-600 mb-1">Cover End Date</label>
+        <input type="date" name="cover_end_date"
+               class="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500" />
+      </div>
+
+      <div>
+        <label class="block text-xs font-medium text-gray-600 mb-1">Total Annual Premium (R)</label>
+        <input type="text" name="total_premium" placeholder="e.g. 45230.00"
+               class="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500" />
+      </div>
+
+      <div>
+        <label class="block text-xs font-medium text-gray-600 mb-1">Notes</label>
+        <input type="text" name="notes" placeholder="Optional notes"
+               class="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500" />
+      </div>
+
+    </div>
+
+    <div class="flex items-center gap-3 mt-5">
+      <button type="submit"
+              class="bg-blue-600 hover:bg-blue-700 text-white text-sm font-medium px-4 py-2 rounded-lg transition-colors">
+        Create Policy
+      </button>
+      <button type="button"
+              hx-get="/insurance/clear-modal"
+              hx-target="#new-policy-container"
+              hx-swap="innerHTML"
+              class="text-sm text-gray-500 hover:text-gray-700">
+        Cancel
+      </button>
+    </div>
+  </form>
+</div>

@@ -1,0 +1,106 @@
+{% extends "base.html" %}
+{% block content %}
+
+<!-- Back link + policy header -->
+<div class="mb-6">
+  <a href="/insurance" class="text-sm text-gray-400 hover:text-gray-600 flex items-center gap-1 mb-3">
+    <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+      <path stroke-linecap="round" stroke-linejoin="round" d="M15 19l-7-7 7-7" />
+    </svg>
+    All Policies
+  </a>
+
+  <div class="flex items-start justify-between">
+    <div>
+      <div class="flex flex-wrap items-center gap-3 text-sm text-gray-500">
+        {% if policy.insurer_name %}<span>{{ policy.insurer_name }}</span>{% endif %}
+        {% if policy.policy_number %}<span class="text-gray-300">|</span><span>{{ policy.policy_number }}</span>{% endif %}
+        {% if policy.cover_start_date and policy.cover_end_date %}
+          <span class="text-gray-300">|</span>
+          <span>{{ policy.cover_start_date.strftime("%d %b %Y") }} – {{ policy.cover_end_date.strftime("%d %b %Y") }}</span>
+        {% endif %}
+        {% if policy.total_premium %}
+          <span class="text-gray-300">|</span>
+          <span>R {{ "%.2f"|format(policy.total_premium|float) }} p.a.</span>
+        {% endif %}
+      </div>
+    </div>
+    <button
+      hx-get="/insurance/{{ policy.id }}/delete-confirm"
+      hx-target="#modal-overlay"
+      hx-swap="innerHTML"
+      class="text-xs text-red-500 hover:text-red-700 font-medium flex-shrink-0 ml-4">
+      Delete Policy
+    </button>
+  </div>
+</div>
+
+<!-- ===== KEY FACTS CARD ===== -->
+<!-- hx-trigger listens for keyFactsRefresh fired by upload/delete routes -->
+<div class="mb-6"
+     hx-get="/insurance/{{ policy.id }}/key-facts"
+     hx-trigger="keyFactsRefresh from:body"
+     hx-target="#key-facts-card"
+     hx-swap="outerHTML">
+  {% include "insurance/partials/key_facts_card.html" %}
+</div>
+
+<!-- ===== DOCUMENT LIST + UPLOAD FORM ===== -->
+<!-- The document_list partial carries its own hx-trigger for docListRefresh -->
+<div class="mb-8">
+  {% include "insurance/partials/document_list.html" %}
+</div>
+
+<!-- ===== CHAT SECTION ===== -->
+<div class="bg-white rounded-xl border border-gray-200 overflow-hidden">
+  <div class="px-5 py-4 border-b border-gray-100">
+    <h2 class="text-sm font-semibold text-gray-700">Ask a Question</h2>
+    <p class="text-xs text-gray-400 mt-0.5">Ask anything about the policy documents. Answers will include page references.</p>
+  </div>
+
+  <!-- Chat history — Q&A pairs appended here -->
+  <div id="chat-history" class="px-5 py-5 space-y-2 min-h-[60px]">
+    {% if not policy.documents or not policy.documents | selectattr("extracted_text") | list %}
+      <p class="text-sm text-gray-400 text-center py-4">
+        Upload at least one readable document to enable Q&amp;A.
+      </p>
+    {% endif %}
+  </div>
+
+  <!-- Chat input form -->
+  <div class="px-5 pb-5 border-t border-gray-100 pt-4">
+    <form
+      hx-post="/insurance/{{ policy.id }}/chat"
+      hx-target="#chat-history"
+      hx-swap="beforeend"
+      hx-on:htmx:after-request="this.reset()"
+      class="flex gap-3">
+
+      <input
+        type="text"
+        name="question"
+        required
+        placeholder="e.g. What is the excess for water damage?"
+        {% if not policy.documents or not policy.documents | selectattr("extracted_text") | list %}
+          disabled title="Upload at least one document to enable Q&A"
+        {% endif %}
+        class="flex-1 border border-gray-300 rounded-lg px-4 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 disabled:bg-gray-50 disabled:text-gray-400 disabled:cursor-not-allowed" />
+
+      <button
+        type="submit"
+        {% if not policy.documents or not policy.documents | selectattr("extracted_text") | list %}
+          disabled
+        {% endif %}
+        class="inline-flex items-center gap-2 bg-blue-600 hover:bg-blue-700 disabled:bg-gray-300 disabled:cursor-not-allowed text-white text-sm font-medium px-4 py-2 rounded-lg transition-colors flex-shrink-0">
+        <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+          <path stroke-linecap="round" stroke-linejoin="round" d="M13 9l3 3m0 0l-3 3m3-3H8m13 0a9 9 0 11-18 0 9 9 0 0118 0z" />
+        </svg>
+        Ask
+      </button>
+
+    </form>
+    <p class="text-xs text-gray-400 mt-2 htmx-indicator">Searching documents — this may take a few seconds…</p>
+  </div>
+</div>
+
+{% endblock %}

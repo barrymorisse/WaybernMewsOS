@@ -3,3 +3,4 @@ from app.models.units import Unit, Contact  # noqa: F401
 from app.models.meter_readings import MeterReading  # noqa: F401
 from app.models.coj_invoice import CojInvoice, CojInvoiceLineItem  # noqa: F401
 from app.models.complex_settings import ComplexSettings  # noqa: F401
+from app.models.insurance import InsurancePolicy, InsuranceDocument  # noqa: F401

@@ -1,0 +1,87 @@
+<!--
+  Key facts card — auto-refreshed via HX-Trigger: keyFactsRefresh.
+  The detail page sets: hx-trigger="keyFactsRefresh from:body" on this element's container.
+-->
+<div id="key-facts-card">
+
+  {% if not merged_facts %}
+    <!-- Empty state: no documents uploaded yet -->
+    <div class="bg-white rounded-xl border border-gray-200 p-6 text-center text-sm text-gray-400">
+      Upload at least one document to see key facts extracted automatically.
+    </div>
+
+  {% else %}
+    <div class="bg-white rounded-xl border border-gray-200 p-6">
+      <h2 class="text-sm font-semibold text-gray-500 uppercase tracking-wider mb-4">Key Facts</h2>
+
+      <div class="grid grid-cols-2 gap-x-8 gap-y-4 text-sm">
+
+        <!-- Scalar fields -->
+        {% set scalar_fields = [
+          ("Insurer", merged_facts.get("insurer")),
+          ("Policy Number", merged_facts.get("policy_number")),
+          ("Cover Start", merged_facts.get("cover_start_date")),
+          ("Cover End", merged_facts.get("cover_end_date")),
+          ("Total Premium", merged_facts.get("total_annual_premium")),
+          ("Total Insured Value", merged_facts.get("total_insured_value")),
+          ("Claims Excess", merged_facts.get("claims_excess")),
+          ("Emergency Contact", merged_facts.get("emergency_contact")),
+          ("Broker", merged_facts.get("broker_name")),
+          ("Broker Contact", merged_facts.get("broker_contact")),
+        ] %}
+
+        {% for label, value in scalar_fields %}
+          {% if value %}
+          <div>
+            <div class="text-xs font-medium text-gray-400 uppercase tracking-wide mb-0.5">{{ label }}</div>
+            <div class="text-gray-800 font-medium">{{ value }}</div>
+          </div>
+          {% endif %}
+        {% endfor %}
+
+      </div>
+
+      <!-- List fields: main covers and key exclusions -->
+      <div class="grid grid-cols-2 gap-x-8 mt-5 pt-5 border-t border-gray-100 text-sm">
+
+        {% if merged_facts.get("main_covers") %}
+        <div>
+          <div class="text-xs font-medium text-gray-400 uppercase tracking-wide mb-2">Main Covers</div>
+          <ul class="space-y-1">
+            {% for item in merged_facts.main_covers %}
+            <li class="flex items-start gap-2 text-gray-700">
+              <span class="mt-1 text-green-500 flex-shrink-0">
+                <svg xmlns="http://www.w3.org/2000/svg" class="h-3.5 w-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2.5">
+                  <path stroke-linecap="round" stroke-linejoin="round" d="M5 13l4 4L19 7" />
+                </svg>
+              </span>
+              {{ item }}
+            </li>
+            {% endfor %}
+          </ul>
+        </div>
+        {% endif %}
+
+        {% if merged_facts.get("key_exclusions") %}
+        <div>
+          <div class="text-xs font-medium text-gray-400 uppercase tracking-wide mb-2">Key Exclusions</div>
+          <ul class="space-y-1">
+            {% for item in merged_facts.key_exclusions %}
+            <li class="flex items-start gap-2 text-gray-700">
+              <span class="mt-1 text-red-400 flex-shrink-0">
+                <svg xmlns="http://www.w3.org/2000/svg" class="h-3.5 w-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2.5">
+                  <path stroke-linecap="round" stroke-linejoin="round" d="M6 18L18 6M6 6l12 12" />
+                </svg>
+              </span>
+              {{ item }}
+            </li>
+            {% endfor %}
+          </ul>
+        </div>
+        {% endif %}
+
+      </div>
+    </div>
+  {% endif %}
+
+</div>

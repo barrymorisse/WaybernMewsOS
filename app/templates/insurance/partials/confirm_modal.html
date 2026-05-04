@@ -1,0 +1,31 @@
+<!-- Delete confirmation modal — loaded into #modal-overlay via HTMX -->
+<!-- The fixed overlay covers the whole screen; clicking Cancel clears it -->
+<div class="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
+  <div class="bg-white rounded-xl p-6 max-w-md w-full mx-4 shadow-xl">
+
+    <h3 class="text-base font-semibold text-gray-900 mb-3">{{ title }}</h3>
+    <p class="text-sm text-gray-600 mb-6">{{ message | safe }}</p>
+
+    <div class="flex items-center justify-end gap-3">
+
+      <!-- Cancel: clear the modal overlay -->
+      <button
+        hx-get="{{ cancel_url }}"
+        hx-target="#modal-overlay"
+        hx-swap="innerHTML"
+        class="text-sm text-gray-500 hover:text-gray-700 font-medium px-4 py-2 rounded-lg border border-gray-200 hover:bg-gray-50 transition-colors">
+        Cancel
+      </button>
+
+      <!-- Confirm: perform the action, clear the modal, trigger list refresh -->
+      <button
+        hx-post="{{ confirm_url }}"
+        hx-target="#modal-overlay"
+        hx-swap="innerHTML"
+        class="text-sm text-white font-medium px-4 py-2 rounded-lg bg-red-600 hover:bg-red-700 transition-colors">
+        {{ confirm_label }}
+      </button>
+
+    </div>
+  </div>
+</div>

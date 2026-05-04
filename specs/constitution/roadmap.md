@@ -257,10 +257,23 @@ A directory of trusted contractors and suppliers used at the complex, with conta
 
 ---
 
-## Module 11: Insurance Management
-**Status:** 🔮 Future consideration  
+## Module 11: Insurance Documents
+**Status:** ✅ Complete  
+**Spec:** `/specs/features/module_11_insurance/`  
 
-Tracking of the complex's insurance policy: insurer, policy number, renewal date, cover summary, claims history.
+Store and query complex insurance documents via a plain-language chat interface.
+
+**Includes:**
+- Policy period records (insurer, cover dates, total premium)
+- PDF upload and management via UI, linked to a policy period
+- Text extraction on upload via pypdf (with `[Page N]` markers for citations)
+- Automatic key facts extraction via Groq on each upload — displayed as a structured card (insurer, cover dates, premium, main covers, key exclusions, claims excess, emergency contact, broker details)
+- Plain-language Q&A chat: ask any question, get answers grounded in the documents with page citations
+- Original PDF viewer (inline in browser tab, same pattern as Module 2b)
+- Confirmation modals on all deletes, with cascade warning when a policy has linked documents
+- Visible error banners when LLM calls fail (document saved, Q&A error message shown — never silent)
+- LLM: Groq (llama-3.3-70b-versatile, temperature=0); Claude Haiku fallback if free-tier limits are hit
+- Uploaded PDFs stored in `documents/insurance/` — gitignored, never committed to GitHub
 
 ---
 
@@ -275,3 +288,5 @@ Tracking of the complex's insurance policy: insurer, policy number, renewal date
 | 2026-04-30 | Module 2b spec written; folder renamed to `module_2b_coj_bill_parsing` to match naming convention | Barry + Claude |
 | 2026-05-01 | Module 2b complete: parsing, 6-check validation suite, auto-save, PDF storage, duplicate handling, Complex Info settings page | Barry + Claude |
 | 2026-05-01 | Module 2b extended: invoice history list + PDF viewer added to CoJ Invoices page | Barry + Claude |
+| 2026-05-04 | Module 11 spec written: Insurance Documents — PDF upload, key facts extraction, plain-language Q&A with page citations | Barry + Claude |
+| 2026-05-04 | Module 11 complete: all routes, models, service layer, and templates built; PDFs gitignored; delete modals with cascade warnings; LLM error handling | Barry + Claude |

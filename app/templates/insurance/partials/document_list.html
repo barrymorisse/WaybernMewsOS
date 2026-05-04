@@ -1,0 +1,139 @@
+<!--
+  Document list + upload form — auto-refreshed via HX-Trigger: docListRefresh.
+  The outer div carries the HTMX auto-refresh attributes so the server can
+  return this whole element as an outerHTML swap after upload.
+-->
+<div id="document-list-container"
+     hx-get="/insurance/{{ policy.id }}/documents"
+     hx-trigger="docListRefresh from:body"
+     hx-swap="outerHTML">
+
+  <!-- Upload error/warning banners -->
+  {% if upload_error %}
+  <div class="mb-4 bg-red-50 border border-red-200 rounded-lg px-4 py-3 text-sm text-red-700">
+    {{ upload_error }}
+  </div>
+  {% endif %}
+  {% if upload_warning %}
+  <div class="mb-4 bg-yellow-50 border border-yellow-200 rounded-lg px-4 py-3 text-sm text-yellow-800">
+    {{ upload_warning }}
+  </div>
+  {% endif %}
+
+  <!-- Document list -->
+  <div class="bg-white rounded-xl border border-gray-200 overflow-hidden mb-4">
+    <div class="px-5 py-3 border-b border-gray-100 flex items-center justify-between">
+      <h2 class="text-sm font-semibold text-gray-700">Documents</h2>
+      <span class="text-xs text-gray-400">{{ policy.documents | length }} file{{ 's' if policy.documents | length != 1 else '' }}</span>
+    </div>
+
+    {% if not policy.documents %}
+      <div class="px-5 py-8 text-center text-sm text-gray-400">
+        No documents uploaded yet. Use the form below to add your first PDF.
+      </div>
+    {% else %}
+      <table class="w-full text-sm">
+        <thead class="bg-gray-50 border-b border-gray-100">
+          <tr>
+            <th class="px-5 py-3 text-left text-xs font-semibold text-gray-500 uppercase tracking-wider">Name</th>
+            <th class="px-5 py-3 text-left text-xs font-semibold text-gray-500 uppercase tracking-wider">Type</th>
+            <th class="px-5 py-3 text-left text-xs font-semibold text-gray-500 uppercase tracking-wider">Pages</th>
+            <th class="px-5 py-3 text-left text-xs font-semibold text-gray-500 uppercase tracking-wider">Uploaded</th>
+            <th class="px-5 py-3 text-left text-xs font-semibold text-gray-500 uppercase tracking-wider">Q&amp;A</th>
+            <th class="px-5 py-3"></th>
+          </tr>
+        </thead>
+        <tbody class="divide-y divide-gray-50">
+          {% for doc in policy.documents %}
+          <tr class="hover:bg-gray-50 transition-colors">
+            <td class="px-5 py-3 font-medium text-gray-800">{{ doc.document_name }}</td>
+            <td class="px-5 py-3 text-gray-500">{{ doc_type_labels.get(doc.document_type, doc.document_type) }}</td>
+            <td class="px-5 py-3 text-gray-500">{{ doc.page_count or "—" }}</td>
+            <td class="px-5 py-3 text-gray-500">
+              {% if doc.uploaded_at %}
+                {{ doc.uploaded_at.strftime("%d %b %Y") }}
+              {% else %}—{% endif %}
+            </td>
+            <td class="px-5 py-3">
+              {% if doc.extracted_text %}
+                <span class="inline-flex items-center gap-1 text-xs text-green-700 bg-green-50 px-2 py-0.5 rounded-full">
+                  <svg xmlns="http://www.w3.org/2000/svg" class="h-3 w-3" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2.5">
+                    <path stroke-linecap="round" stroke-linejoin="round" d="M5 13l4 4L19 7" />
+                  </svg>
+                  Ready
+                </span>
+              {% else %}
+                <span class="text-xs text-gray-400">Not available</span>
+              {% endif %}
+            </td>
+            <td class="px-5 py-3 text-right">
+              <div class="flex items-center justify-end gap-3">
+                {% if doc.file_path %}
+                <a href="/insurance/documents/{{ doc.id }}/pdf" target="_blank"
+                   class="text-xs text-blue-600 hover:text-blue-800 font-medium">
+                  View PDF
+                </a>
+                {% endif %}
+                <button
+                  hx-get="/insurance/documents/{{ doc.id }}/delete-confirm"
+                  hx-target="#modal-overlay"
+                  hx-swap="innerHTML"
+                  class="text-xs text-red-500 hover:text-red-700 font-medium">
+                  Delete
+                </button>
+              </div>
+            </td>
+          </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    {% endif %}
+  </div>
+
+  <!-- Upload form -->
+  <div class="bg-white rounded-xl border border-gray-200 p-5">
+    <h3 class="text-sm font-semibold text-gray-700 mb-4">Upload Document</h3>
+    <form
+      hx-post="/insurance/{{ policy.id }}/documents"
+      hx-target="#document-list-container"
+      hx-swap="outerHTML"
+      hx-encoding="multipart/form-data"
+      hx-on:htmx:after-request="this.reset()">
+
+      <div class="grid grid-cols-2 gap-4 mb-4">
+        <div>
+          <label class="block text-xs font-medium text-gray-600 mb-1">Document Name <span class="text-red-500">*</span></label>
+          <input type="text" name="document_name" required placeholder="e.g. Policy Document"
+                 class="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500" />
+        </div>
+        <div>
+          <label class="block text-xs font-medium text-gray-600 mb-1">Type <span class="text-red-500">*</span></label>
+          <select name="document_type" required
+                  class="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500">
+            {% for value, label in doc_type_options %}
+            <option value="{{ value }}">{{ label }}</option>
+            {% endfor %}
+          </select>
+        </div>
+      </div>
+
+      <div class="mb-4">
+        <label class="block text-xs font-medium text-gray-600 mb-1">PDF File <span class="text-red-500">*</span></label>
+        <input type="file" name="pdf_file" accept=".pdf" required
+               class="w-full text-sm text-gray-600 file:mr-3 file:py-1.5 file:px-3 file:rounded-lg file:border-0 file:text-sm file:font-medium file:bg-blue-50 file:text-blue-700 hover:file:bg-blue-100 cursor-pointer" />
+      </div>
+
+      <div class="flex items-center gap-3">
+        <button type="submit"
+                class="inline-flex items-center gap-2 bg-blue-600 hover:bg-blue-700 text-white text-sm font-medium px-4 py-2 rounded-lg transition-colors">
+          <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+            <path stroke-linecap="round" stroke-linejoin="round" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-8l-4-4m0 0L8 8m4-4v12" />
+          </svg>
+          Upload &amp; Extract
+        </button>
+        <span class="text-xs text-gray-400 htmx-indicator">Extracting text and key facts — this may take a moment…</span>
+      </div>
+    </form>
+  </div>
+
+</div>
