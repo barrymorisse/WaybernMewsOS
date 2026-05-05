@@ -1,0 +1,80 @@
+{% extends "base.html" %}
+{% block content %}
+
+<div class="max-w-5xl">
+
+  <div class="flex items-center justify-between mb-6">
+    <div>
+      <p class="text-sm text-gray-500">
+        Monthly allocation of CoJ electricity and water charges across the 5 units.
+        Calculations run automatically when meter readings and both invoices are present.
+      </p>
+    </div>
+  </div>
+
+  {% if not periods %}
+    <div class="bg-white rounded-xl border border-gray-200 p-10 text-center text-gray-400">
+      No billing data yet. Upload CoJ invoices and enter meter readings to begin.
+    </div>
+  {% else %}
+  <div class="bg-white rounded-xl border border-gray-200 overflow-hidden">
+    <table class="w-full text-sm">
+      <thead class="bg-gray-50 border-b border-gray-200 text-xs uppercase tracking-wide text-gray-500">
+        <tr>
+          <th class="px-5 py-3 text-left">Billing Period</th>
+          <th class="px-5 py-3 text-left">Status</th>
+          <th class="px-5 py-3 text-right">Total Electricity</th>
+          <th class="px-5 py-3 text-right">Total Water</th>
+          <th class="px-5 py-3 text-right">Grand Total</th>
+          <th class="px-5 py-3"></th>
+        </tr>
+      </thead>
+      <tbody class="divide-y divide-gray-100">
+        {% for p in periods %}
+          {% set calc = p.calculation %}
+          <tr class="hover:bg-gray-50 transition-colors">
+            <td class="px-5 py-3 font-medium text-gray-800">
+              {{ month_names[p.billing_month] }} {{ p.billing_year }}
+            </td>
+            <td class="px-5 py-3">
+              {% if not calc %}
+                <span class="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-medium bg-gray-100 text-gray-500">
+                  Pending
+                </span>
+              {% elif not calc.elec_reconciled or not calc.water_reconciled %}
+                <span class="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-medium bg-red-100 text-red-700">
+                  Reconciliation Error
+                </span>
+              {% else %}
+                <span class="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-medium bg-green-100 text-green-700">
+                  Calculated ✓
+                </span>
+              {% endif %}
+            </td>
+            <td class="px-5 py-3 text-right text-gray-700 font-mono">
+              {% if calc %}R {{ "%.2f"|format(calc.elec_units_total|float) }}{% else %}—{% endif %}
+            </td>
+            <td class="px-5 py-3 text-right text-gray-700 font-mono">
+              {% if calc %}R {{ "%.2f"|format(calc.water_units_total|float) }}{% else %}—{% endif %}
+            </td>
+            <td class="px-5 py-3 text-right font-semibold text-gray-800 font-mono">
+              {% if calc %}
+                R {{ "%.2f"|format((calc.elec_units_total|float) + (calc.water_units_total|float)) }}
+              {% else %}—{% endif %}
+            </td>
+            <td class="px-5 py-3 text-right">
+              <a href="/utility-billing/{{ p.billing_year }}/{{ p.billing_month }}"
+                 class="text-blue-600 hover:text-blue-800 text-xs font-medium">
+                View →
+              </a>
+            </td>
+          </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+  {% endif %}
+
+</div>
+
+{% endblock %}

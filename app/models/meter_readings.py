@@ -9,7 +9,7 @@ Consumption for a given month is derived by subtracting the prior month's
 reading at query time — it is never stored here.
 """
 
-from sqlalchemy import Column, Integer, Float, Date, UniqueConstraint
+from sqlalchemy import Column, Integer, Float, Date, UniqueConstraint, Numeric
 from app.database import Base
 
 
@@ -37,6 +37,40 @@ class MeterReading(Base):
     water_unit_4 = Column(Float, nullable=True)
     water_unit_5 = Column(Float, nullable=True)
     water_total = Column(Float, nullable=True)
+
+    # --- Derived columns populated by Module 2c billing calculation ---
+    # Consumption = this month's reading minus previous month's reading.
+    # These are written when a billing calculation runs and cleared on recalculate.
+
+    # Raw consumption per unit and common property (current − previous reading)
+    elec_unit_1_consumption = Column(Numeric(12, 4), nullable=True)
+    elec_unit_2_consumption = Column(Numeric(12, 4), nullable=True)
+    elec_unit_3_consumption = Column(Numeric(12, 4), nullable=True)
+    elec_unit_4_consumption = Column(Numeric(12, 4), nullable=True)
+    elec_unit_5_consumption = Column(Numeric(12, 4), nullable=True)
+    elec_common_consumption  = Column(Numeric(12, 4), nullable=True)  # max(0, total − sum of units)
+
+    water_unit_1_consumption = Column(Numeric(12, 4), nullable=True)
+    water_unit_2_consumption = Column(Numeric(12, 4), nullable=True)
+    water_unit_3_consumption = Column(Numeric(12, 4), nullable=True)
+    water_unit_4_consumption = Column(Numeric(12, 4), nullable=True)
+    water_unit_5_consumption = Column(Numeric(12, 4), nullable=True)
+    water_common_consumption  = Column(Numeric(12, 4), nullable=True)
+
+    # Adjusted consumption (raw × CoJ adjustment factor) — aligns our readings to CoJ totals
+    elec_unit_1_adjusted = Column(Numeric(12, 4), nullable=True)
+    elec_unit_2_adjusted = Column(Numeric(12, 4), nullable=True)
+    elec_unit_3_adjusted = Column(Numeric(12, 4), nullable=True)
+    elec_unit_4_adjusted = Column(Numeric(12, 4), nullable=True)
+    elec_unit_5_adjusted = Column(Numeric(12, 4), nullable=True)
+    elec_common_adjusted  = Column(Numeric(12, 4), nullable=True)
+
+    water_unit_1_adjusted = Column(Numeric(12, 4), nullable=True)
+    water_unit_2_adjusted = Column(Numeric(12, 4), nullable=True)
+    water_unit_3_adjusted = Column(Numeric(12, 4), nullable=True)
+    water_unit_4_adjusted = Column(Numeric(12, 4), nullable=True)
+    water_unit_5_adjusted = Column(Numeric(12, 4), nullable=True)
+    water_common_adjusted  = Column(Numeric(12, 4), nullable=True)
 
     # Enforce one reading set per calendar month
     __table_args__ = (

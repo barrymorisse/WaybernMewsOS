@@ -53,6 +53,52 @@ def _apply_migrations():
         ("coj_invoices",     "pdf_path",                 "VARCHAR"),
         ("complex_settings", "electricity_meter_number", "VARCHAR"),
         ("complex_settings", "water_meter_number",       "VARCHAR"),
+        # Module 2c — derived consumption and grossed-up figures on meter_readings
+        ("meter_readings", "elec_unit_1_consumption",  "NUMERIC(12,4)"),
+        ("meter_readings", "elec_unit_2_consumption",  "NUMERIC(12,4)"),
+        ("meter_readings", "elec_unit_3_consumption",  "NUMERIC(12,4)"),
+        ("meter_readings", "elec_unit_4_consumption",  "NUMERIC(12,4)"),
+        ("meter_readings", "elec_unit_5_consumption",  "NUMERIC(12,4)"),
+        ("meter_readings", "elec_common_consumption",  "NUMERIC(12,4)"),
+        ("meter_readings", "elec_unit_1_grossed_up",   "NUMERIC(12,4)"),
+        ("meter_readings", "elec_unit_2_grossed_up",   "NUMERIC(12,4)"),
+        ("meter_readings", "elec_unit_3_grossed_up",   "NUMERIC(12,4)"),
+        ("meter_readings", "elec_unit_4_grossed_up",   "NUMERIC(12,4)"),
+        ("meter_readings", "elec_unit_5_grossed_up",   "NUMERIC(12,4)"),
+        ("meter_readings", "elec_common_grossed_up",   "NUMERIC(12,4)"),
+        ("meter_readings", "water_unit_1_consumption", "NUMERIC(12,4)"),
+        ("meter_readings", "water_unit_2_consumption", "NUMERIC(12,4)"),
+        ("meter_readings", "water_unit_3_consumption", "NUMERIC(12,4)"),
+        ("meter_readings", "water_unit_4_consumption", "NUMERIC(12,4)"),
+        ("meter_readings", "water_unit_5_consumption", "NUMERIC(12,4)"),
+        ("meter_readings", "water_common_consumption", "NUMERIC(12,4)"),
+        ("meter_readings", "water_unit_1_grossed_up",  "NUMERIC(12,4)"),
+        ("meter_readings", "water_unit_2_grossed_up",  "NUMERIC(12,4)"),
+        ("meter_readings", "water_unit_3_grossed_up",  "NUMERIC(12,4)"),
+        ("meter_readings", "water_unit_4_grossed_up",  "NUMERIC(12,4)"),
+        ("meter_readings", "water_unit_5_grossed_up",  "NUMERIC(12,4)"),
+        ("meter_readings", "water_common_grossed_up",  "NUMERIC(12,4)"),
+        # VAT scaling factors added to billing_calculations
+        ("billing_calculations", "elec_vat_factor",  "NUMERIC(10,6)"),
+        ("billing_calculations", "water_vat_factor", "NUMERIC(10,6)"),
+    ]
+    # Rename columns: gross-up → adjustment terminology (2026-05)
+    rename_columns = [
+        ("meter_readings",        "elec_unit_1_grossed_up",   "elec_unit_1_adjusted"),
+        ("meter_readings",        "elec_unit_2_grossed_up",   "elec_unit_2_adjusted"),
+        ("meter_readings",        "elec_unit_3_grossed_up",   "elec_unit_3_adjusted"),
+        ("meter_readings",        "elec_unit_4_grossed_up",   "elec_unit_4_adjusted"),
+        ("meter_readings",        "elec_unit_5_grossed_up",   "elec_unit_5_adjusted"),
+        ("meter_readings",        "elec_common_grossed_up",   "elec_common_adjusted"),
+        ("meter_readings",        "water_unit_1_grossed_up",  "water_unit_1_adjusted"),
+        ("meter_readings",        "water_unit_2_grossed_up",  "water_unit_2_adjusted"),
+        ("meter_readings",        "water_unit_3_grossed_up",  "water_unit_3_adjusted"),
+        ("meter_readings",        "water_unit_4_grossed_up",  "water_unit_4_adjusted"),
+        ("meter_readings",        "water_unit_5_grossed_up",  "water_unit_5_adjusted"),
+        ("meter_readings",        "water_common_grossed_up",  "water_common_adjusted"),
+        ("billing_calculations",  "elec_gross_up_factor",     "elec_adjustment_factor"),
+        ("billing_calculations",  "water_gross_up_factor",    "water_adjustment_factor"),
+        ("billing_step_allocations", "grossed_up_usage",      "adjusted_usage"),
     ]
     drop_columns = [
         ("coj_invoices", "meter_number"),
@@ -64,6 +110,12 @@ def _apply_migrations():
                 conn.commit()
             except Exception:
                 pass  # Column already exists
+        for table, old_col, new_col in rename_columns:
+            try:
+                conn.execute(text(f"ALTER TABLE {table} RENAME COLUMN {old_col} TO {new_col}"))
+                conn.commit()
+            except Exception:
+                pass  # Already renamed or column doesn't exist
         for table, column in drop_columns:
             try:
                 conn.execute(text(f"ALTER TABLE {table} DROP COLUMN {column}"))

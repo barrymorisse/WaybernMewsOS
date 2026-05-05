@@ -15,7 +15,9 @@ from fastapi import HTTPException
 import os
 
 from app.database import get_db
+from app.models.billing import BillingCalculation
 from app.services import meter_readings as reading_service
+from app.services import billing_service
 
 router = APIRouter(prefix="/meter-readings", tags=["meter-readings"])
 
@@ -110,6 +112,14 @@ async def add_reading_submit(
                 "error": e.detail,
             },
         )
+
+    # Attempt to auto-trigger billing calculation — failure must never block the save
+    try:
+        result = billing_service.check_and_trigger(year, month, db)
+        print(f"[billing] trigger after reading save for {year}-{month:02d}: {result}")
+    except Exception as e:
+        print(f"[billing] auto-trigger failed after reading save for {year}-{month:02d}: {e}")
+
     return RedirectResponse(url="/meter-readings", status_code=303)
 
 
@@ -162,5 +172,17 @@ async def edit_reading_submit(
         "water_unit_4": water_unit_4, "water_unit_5": water_unit_5,
         "water_total": water_total,
     }
-    reading_service.update_reading(db, reading_id, data)
+    updated = reading_service.update_reading(db, reading_id, data)
+
+    # After an edit, re-run billing if a calculation already exists for this month
+    try:
+        existing_calc = db.query(BillingCalculation).filter_by(
+            billing_year=updated.year, billing_month=updated.month
+        ).first()
+        if existing_calc:
+            billing_service.run_calculation(updated.year, updated.month, db)
+            print(f"[billing] recalculated after reading edit for {updated.year}-{updated.month:02d}")
+    except Exception as e:
+        print(f"[billing] recalculate failed after reading edit: {e}")
+
     return RedirectResponse(url="/meter-readings", status_code=303)

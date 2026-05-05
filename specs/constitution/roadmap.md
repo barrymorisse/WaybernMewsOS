@@ -56,7 +56,7 @@ A registry of all 5 units and every person associated with them.
 ---
 
 ## Module 2: Utility Billing
-**Status:** 🔄 In progress — broken into sub-modules (2a ✅ → 2b ✅ → 2c 💡)
+**Status:** ✅ Complete — broken into sub-modules (2a ✅ → 2b ✅ → 2c ✅)
 
 The full utility billing workflow, built incrementally. Each sub-module is a standalone deliverable that feeds into the next.
 
@@ -99,27 +99,34 @@ Parse the City of Joburg bulk utility bill PDFs to extract the rand amounts and 
 ---
 
 ### Module 2c: Utility Consumption & Allocation
-**Status:** 💡 Planned
+**Status:** ✅ Complete  
+**Spec:** `/specs/features/module_2c_utility_allocation/`
 
-Calculate per-unit consumption from stored readings, reconcile against the CoJ invoice, and produce grossed-up figures for billing.
+Calculate per-unit consumption from stored readings, reconcile against the CoJ invoice, and allocate costs to each unit.
 
-**Data model (already built by Module 2b):**
-- `coj_invoices` table stores one row per invoice (electricity and water), keyed by `invoice_type + statement_year + statement_month`
-- `billing_year` and `billing_month` on each invoice are one month behind the statement date — this is the join key to `meter_readings`
-- e.g. a March 2026 invoice (`statement_month=3`) has `billing_month=2`, linking it to the February 2026 meter readings
-- CoJ reading dates differ from Barry's reading dates — no hard FK; join is by year + month
+**Data model:**
+- `billing_calculations` — one row per billing month; stores CoJ adjustment factors, fixed/variable cost totals, reconciliation results
+- `unit_billing_allocations` — five rows per calculation (one per unit); stores electricity and water cost breakdown
+- `billing_step_allocations` — one row per consumer per step; stores the full step-by-step workings for display
+- `meter_readings` extended with 24 derived columns: raw consumption (`*_consumption`) and CoJ-adjusted consumption (`*_adjusted`) for each of the 6 consumers (5 units + common property), for both electricity and water
 
-**Calculation logic (to be built into the UI):**
-- Our unit consumption (elec & water): `this month reading − last month reading`
-- Our common property elec: `elec_total_usage − sum(unit 1–5 elec usage)` — public lighting stored for reference only, not used in this calculation
-- Our common property water: `water_total_usage − sum(unit 1–5 water usage)`
-- CoJ total usage: derived from CoJ readings the same way
-- Gross-up factor: `coj_total_usage ÷ our_total_usage` (one factor for elec, one for water)
-- Grossed-up figure per unit/common property: `raw_usage × gross-up factor` — applied uniformly, not per-unit
+**Calculation logic:**
+- Raw consumption: `this month reading − last month reading` per unit; common property = `total − sum(units)`, clamped to 0 if negative
+- CoJ adjustment factor: `CoJ_consumption ÷ our_total_consumption` (one factor for elec, one for water); may be >1 or <1 depending on reading date differences
+- Adjusted figure per consumer: `raw × adjustment_factor` — applied uniformly; adjusted figures sum exactly to CoJ invoice consumption
+- Step cost allocation: iterative equal-split algorithm — within each step, usage divided equally among consumers with remaining adjusted usage; exhausted consumers absorbed and remainder redistributed
+- Fixed costs split equally across 5 units; sewerage excluded from water billing entirely
+- Common property variable cost split equally across 5 units
+- Rounding adjustment applied to Unit 1 if needed to ensure `sum(unit bills) = CoJ target` exactly
+- Full `Decimal` precision maintained throughout — no intermediate rounding; only formatted for display in templates
 
-**UI (to be built):**
-- Review screen showing: raw usage, gross-up factor, and grossed-up figures per unit + common property
-- Confirm to finalise (feeds into levy/utility billing)
+**UI:**
+- Billing period list page with status badges (Calculated / Pending / Reconciliation Error)
+- Overview page: per-unit electricity and water charges in summary table + links to detail screens
+- Electricity detail screen: combined meter/adjustment table, step allocation workings, fixed costs, reconciliation
+- Water detail screen: same structure with sewer exclusion shown
+- Recalculate button with confirmation modal
+- Auto-trigger fires when all three inputs (elec invoice, water invoice, meter readings) are present for a billing month
 
 ---
 
@@ -290,3 +297,5 @@ Store and query complex insurance documents via a plain-language chat interface.
 | 2026-05-01 | Module 2b extended: invoice history list + PDF viewer added to CoJ Invoices page | Barry + Claude |
 | 2026-05-04 | Module 11 spec written: Insurance Documents — PDF upload, key facts extraction, plain-language Q&A with page citations | Barry + Claude |
 | 2026-05-04 | Module 11 complete: all routes, models, service layer, and templates built; PDFs gitignored; delete modals with cascade warnings; LLM error handling | Barry + Claude |
+| 2026-05-05 | Module 2c complete: billing calculation service, step allocation algorithm, per-unit cost allocations, reconciliation, auto-trigger, list/overview/electricity/water detail screens | Barry + Claude |
+| 2026-05-05 | Module 2c: terminology updated throughout — "gross-up" renamed to "adjustment" (CoJ adjustment factor); DB columns renamed accordingly; full Decimal precision maintained, rounding deferred to display only | Barry + Claude |

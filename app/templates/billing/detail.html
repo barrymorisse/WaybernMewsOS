@@ -1,0 +1,154 @@
+{% extends "base.html" %}
+{% block content %}
+
+{% macro zar(value) %}
+  {% if value is not none %}R {{ "{:,.2f}".format(value|float) }}{% else %}—{% endif %}
+{% endmacro %}
+
+<div class="max-w-4xl">
+
+  {# Breadcrumb #}
+  <p class="text-sm text-gray-400 mb-6">
+    <a href="/utility-billing" class="hover:text-gray-600">Utility Billing</a>
+    &rsaquo; {{ month_names[billing_month] }} {{ billing_year }}
+  </p>
+
+  {# ── NOT YET CALCULATED ────────────────────────────────────────────────── #}
+  {% if not calculation %}
+    <div class="bg-white rounded-xl border border-gray-200 p-8 max-w-xl">
+      <p class="font-semibold text-gray-800 mb-2">Not yet calculated</p>
+      <p class="text-sm text-gray-500 mb-4">
+        The billing calculation runs automatically once all three inputs are present:
+      </p>
+      <ul class="text-sm space-y-2">
+        <li class="flex items-center gap-2">
+          {% if reading %}
+            <span class="text-green-600 font-bold">✓</span>
+          {% else %}
+            <span class="text-gray-400">○</span>
+          {% endif %}
+          <span class="{% if not reading %}text-gray-400{% endif %}">Meter readings for {{ month_names[billing_month] }} {{ billing_year }}</span>
+        </li>
+        <li class="flex items-center gap-2">
+          {% if elec_inv %}
+            <span class="text-green-600 font-bold">✓</span>
+          {% else %}
+            <span class="text-gray-400">○</span>
+          {% endif %}
+          <span class="{% if not elec_inv %}text-gray-400{% endif %}">Electricity invoice (billing period {{ month_names[billing_month] }} {{ billing_year }})</span>
+        </li>
+        <li class="flex items-center gap-2">
+          {% if water_inv %}
+            <span class="text-green-600 font-bold">✓</span>
+          {% else %}
+            <span class="text-gray-400">○</span>
+          {% endif %}
+          <span class="{% if not water_inv %}text-gray-400{% endif %}">Water &amp; sanitation invoice (billing period {{ month_names[billing_month] }} {{ billing_year }})</span>
+        </li>
+      </ul>
+    </div>
+
+  {# ── OVERVIEW ──────────────────────────────────────────────────────────── #}
+  {% else %}
+
+  {# Clamping warning #}
+  {% if calculation.common_property_clamped %}
+    <div class="bg-yellow-50 border border-yellow-200 rounded-lg px-4 py-3 text-sm text-yellow-800 mb-6 flex gap-2">
+      <span class="font-semibold">⚠ Warning:</span>
+      Common property consumption was clamped to zero — the sum of unit meter readings exceeded
+      the total meter reading. Check meter data for this period.
+    </div>
+  {% endif %}
+
+  {# Reconciliation error banner #}
+  {% if not calculation.elec_reconciled or not calculation.water_reconciled %}
+    <div class="bg-red-50 border border-red-200 rounded-lg px-4 py-3 text-sm text-red-800 mb-6 flex gap-2">
+      <span class="font-semibold">✗ Reconciliation error:</span>
+      {% if not calculation.elec_reconciled %}Electricity unit bills do not match CoJ total.{% endif %}
+      {% if not calculation.water_reconciled %}Water unit bills do not match CoJ target.{% endif %}
+    </div>
+  {% endif %}
+
+  {# Per-unit summary table #}
+  <div class="bg-white rounded-xl border border-gray-200 overflow-hidden mb-6">
+    <div class="px-4 py-2 bg-gray-50 border-b border-gray-200 text-xs font-semibold text-gray-500 uppercase tracking-wide">
+      {{ month_names[billing_month] }} {{ billing_year }} — Utility Charges per Unit
+    </div>
+    <table class="w-full text-sm">
+      <thead class="text-xs text-gray-400 border-b border-gray-100">
+        <tr>
+          <th class="px-4 py-2.5 text-left">Unit</th>
+          <th class="px-4 py-2.5 text-right">Electricity</th>
+          <th class="px-4 py-2.5 text-right">Water</th>
+        </tr>
+      </thead>
+      <tbody class="divide-y divide-gray-100 font-mono text-sm">
+        {% for alloc in calculation.unit_allocations %}
+          <tr>
+            <td class="px-4 py-2.5 font-sans text-gray-700 font-medium">Unit {{ alloc.unit_number }}</td>
+            <td class="px-4 py-2.5 text-right text-blue-700 font-semibold">{{ zar(alloc.total_elec) }}</td>
+            <td class="px-4 py-2.5 text-right text-teal-700 font-semibold">{{ zar(alloc.total_water) }}</td>
+          </tr>
+        {% endfor %}
+        <tr class="bg-gray-50 text-xs border-t border-gray-200">
+          <td class="px-4 py-2 font-sans text-gray-500">CoJ total (reconciliation check)</td>
+          <td class="px-4 py-2 text-right text-gray-500">
+            {{ zar(calculation.elec_units_total) }}
+            {% if calculation.elec_reconciled %}<span class="text-green-600 ml-1">✓</span>{% else %}<span class="text-red-600 ml-1">✗</span>{% endif %}
+          </td>
+          <td class="px-4 py-2 text-right text-gray-500">
+            {{ zar(calculation.water_units_total) }}
+            {% if calculation.water_reconciled %}<span class="text-green-600 ml-1">✓</span>{% else %}<span class="text-red-600 ml-1">✗</span>{% endif %}
+          </td>
+        </tr>
+      </tbody>
+    </table>
+  </div>
+
+  {# View calculation buttons #}
+  <div class="flex gap-4 mb-10">
+    <a href="/utility-billing/{{ billing_year }}/{{ billing_month }}/electricity"
+       class="flex items-center gap-2 px-5 py-2.5 bg-blue-600 text-white text-sm font-medium rounded-lg hover:bg-blue-700 transition-colors">
+      View Electricity Calculation
+      <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7"/>
+      </svg>
+    </a>
+    <a href="/utility-billing/{{ billing_year }}/{{ billing_month }}/water"
+       class="flex items-center gap-2 px-5 py-2.5 bg-teal-600 text-white text-sm font-medium rounded-lg hover:bg-teal-700 transition-colors">
+      View Water Calculation
+      <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7"/>
+      </svg>
+    </a>
+  </div>
+
+  {# Notes #}
+  {% if calculation.notes %}
+    <div class="bg-gray-50 border border-gray-200 rounded-lg px-4 py-3 text-xs text-gray-500 max-w-2xl mb-6">
+      <p class="font-semibold text-gray-600 mb-1">Calculation notes</p>
+      {% for line in calculation.notes.split('\n') %}
+        <p>{{ line }}</p>
+      {% endfor %}
+    </div>
+  {% endif %}
+
+  {# Recalculate #}
+  <div class="pt-4 border-t border-gray-200">
+    <button
+      hx-get="/utility-billing/{{ billing_year }}/{{ billing_month }}/recalc-modal"
+      hx-target="#modal-overlay"
+      hx-swap="innerHTML"
+      class="px-4 py-2 text-sm text-gray-600 bg-white border border-gray-300 rounded-lg hover:bg-gray-50 transition-colors">
+      Recalculate
+    </button>
+    <p class="text-xs text-gray-400 mt-2">
+      Overwrites the existing calculation. Use after correcting meter readings or uploading a revised invoice.
+    </p>
+  </div>
+
+  {% endif %}{# end if calculation #}
+
+</div>
+
+{% endblock %}

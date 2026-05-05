@@ -21,6 +21,7 @@ from app.routers import meter_readings as meter_readings_router
 from app.routers import coj_invoices as coj_invoices_router
 from app.routers import complex_info as complex_info_router
 from app.routers import insurance as insurance_router
+from app.routers import billing as billing_router
 
 
 @asynccontextmanager
@@ -50,6 +51,7 @@ app.include_router(meter_readings_router.router)
 app.include_router(coj_invoices_router.router)
 app.include_router(complex_info_router.router)
 app.include_router(insurance_router.router)
+app.include_router(billing_router.router)
 
 
 @app.get("/")

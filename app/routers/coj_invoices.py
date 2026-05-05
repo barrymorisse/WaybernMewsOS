@@ -24,6 +24,7 @@ from app.services.coj_persistence import (
     billing_period, delete_temp, load_temp, save_pdf, save_temp, write_invoice,
     _PROJECT_ROOT,
 )
+from app.services import billing_service
 
 router = APIRouter(prefix="/coj-invoices", tags=["coj-invoices"])
 
@@ -193,6 +194,13 @@ async def parse_invoice_upload(
     pdf_path = save_pdf(invoice_type, extracted["statement_year"], extracted["statement_month"], file_bytes)
     invoice = write_invoice(db, invoice_type, extracted, result["steps"], pdf_path)
 
+    try:
+        trigger_result = billing_service.check_and_trigger(invoice.billing_year, invoice.billing_month, db)
+        print(f"[billing] trigger after invoice save ({invoice_type}) for "
+              f"{invoice.billing_year}-{invoice.billing_month:02d}: {trigger_result}")
+    except Exception as e:
+        print(f"[billing] auto-trigger failed after invoice save: {e}")
+
     ctx = _results_context(result, invoice_type, saved=True)
     ctx["invoice_id"] = invoice.id
     return templates.TemplateResponse(
@@ -233,6 +241,13 @@ async def overwrite_invoice(
     pdf_path = save_pdf(invoice_type, extracted["statement_year"], extracted["statement_month"], pdf_bytes)
     invoice = write_invoice(db, invoice_type, extracted, payload["steps"], pdf_path)
     delete_temp(temp_key)
+
+    try:
+        trigger_result = billing_service.check_and_trigger(invoice.billing_year, invoice.billing_month, db)
+        print(f"[billing] trigger after invoice overwrite ({invoice_type}) for "
+              f"{invoice.billing_year}-{invoice.billing_month:02d}: {trigger_result}")
+    except Exception as e:
+        print(f"[billing] auto-trigger failed after invoice overwrite: {e}")
 
     result = {
         "extracted": extracted,

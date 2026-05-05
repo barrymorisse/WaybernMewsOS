@@ -1,0 +1,334 @@
+{% extends "base.html" %}
+{% block content %}
+
+{% macro zar(value) %}
+  {% if value is not none %}R {{ "{:,.2f}".format(value|float) }}{% else %}—{% endif %}
+{% endmacro %}
+{% macro qty4(value) %}
+  {% if value is not none %}{{ "{:,.4f}".format(value|float) }}{% else %}—{% endif %}
+{% endmacro %}
+{% macro section(title) %}
+  <h2 class="text-base font-semibold text-gray-800 mb-3 mt-8 pb-1 border-b border-gray-200">{{ title }}</h2>
+{% endmacro %}
+
+<div class="max-w-5xl">
+
+  {# Breadcrumb #}
+  <p class="text-sm text-gray-400 mb-6">
+    <a href="/utility-billing" class="hover:text-gray-600">Utility Billing</a>
+    &rsaquo;
+    <a href="/utility-billing/{{ billing_year }}/{{ billing_month }}" class="hover:text-gray-600">{{ month_names[billing_month] }} {{ billing_year }}</a>
+    &rsaquo; Water
+  </p>
+
+  {% if not calculation %}
+    <div class="bg-white rounded-xl border border-gray-200 p-8 max-w-xl">
+      <p class="font-semibold text-gray-800 mb-1">No calculation available</p>
+      <p class="text-sm text-gray-500">
+        Return to the <a href="/utility-billing/{{ billing_year }}/{{ billing_month }}" class="text-blue-600 hover:underline">overview</a>
+        to see what inputs are still missing.
+      </p>
+    </div>
+  {% else %}
+
+  {# Clamping warning #}
+  {% if calculation.common_property_clamped %}
+    <div class="bg-yellow-50 border border-yellow-200 rounded-lg px-4 py-3 text-sm text-yellow-800 mb-6 flex gap-2">
+      <span class="font-semibold">⚠ Warning:</span>
+      Common property water consumption was clamped to zero — sum of unit readings exceeded total.
+    </div>
+  {% endif %}
+
+  {# ── A: METER READINGS & GROSS-UP ─────────────────────────────────────── #}
+  {{ section("A — Meter Readings & CoJ Adjustment") }}
+  <div class="grid grid-cols-3 gap-6">
+
+    {# Combined readings + grossed-up table (spans 2 columns) #}
+    <div class="col-span-2 bg-white rounded-xl border border-gray-200 overflow-hidden">
+      <table class="w-full text-sm">
+        <thead class="text-xs text-gray-400 border-b border-gray-100 bg-gray-50">
+          <tr>
+            <th class="px-4 py-2 text-left">Meter</th>
+            <th class="px-4 py-2 text-right">Prev. Reading</th>
+            <th class="px-4 py-2 text-right">Curr. Reading</th>
+            <th class="px-4 py-2 text-right">Raw (kL)</th>
+            <th class="px-4 py-2 text-right">Adjusted (kL)</th>
+          </tr>
+        </thead>
+        <tbody class="divide-y divide-gray-50 font-mono text-xs">
+          {% for n in range(1, 6) %}
+            <tr>
+              <td class="px-4 py-1.5 text-gray-600 font-sans">Unit {{ n }}</td>
+              <td class="px-4 py-1.5 text-right text-gray-400">{{ qty4(prev_reading["water_unit_" ~ n] if prev_reading else none) }}</td>
+              <td class="px-4 py-1.5 text-right text-gray-600">{{ qty4(reading["water_unit_" ~ n] if reading else none) }}</td>
+              <td class="px-4 py-1.5 text-right">{{ qty4(reading["water_unit_" ~ n ~ "_consumption"] if reading else none) }}</td>
+              <td class="px-4 py-1.5 text-right font-semibold text-teal-700">{{ qty4(reading["water_unit_" ~ n ~ "_adjusted"] if reading else none) }}</td>
+            </tr>
+          {% endfor %}
+          <tr class="bg-teal-50">
+            <td class="px-4 py-1.5 text-gray-600 font-sans">Common Property</td>
+            <td class="px-4 py-1.5 text-right text-gray-400">—</td>
+            <td class="px-4 py-1.5 text-right text-gray-400">—</td>
+            <td class="px-4 py-1.5 text-right">{{ qty4(reading.water_common_consumption if reading else none) }}</td>
+            <td class="px-4 py-1.5 text-right font-semibold text-teal-700">{{ qty4(reading.water_common_adjusted if reading else none) }}</td>
+          </tr>
+          {# Reconciliation footer: sum of grossed-up vs CoJ consumption #}
+          {% set gu_total = namespace(val=0) %}
+          {% for n in range(1, 6) %}
+            {% set gu_total.val = gu_total.val + (reading["water_unit_" ~ n ~ "_adjusted"]|float if reading and reading["water_unit_" ~ n ~ "_adjusted"] is not none else 0) %}
+          {% endfor %}
+          {% set gu_total.val = gu_total.val + (reading.water_common_adjusted|float if reading and reading.water_common_adjusted is not none else 0) %}
+          {% set coj_cons = water_inv.consumption|float if water_inv and water_inv.consumption else 0 %}
+          {% set reconciled = (gu_total.val - coj_cons)|abs < 0.01 %}
+          <tr class="bg-gray-100 border-t border-gray-200 font-semibold text-xs">
+            <td class="px-4 py-2 font-sans text-gray-700" colspan="4">Total adjusted vs CoJ consumption</td>
+            <td class="px-4 py-2 text-right">
+              {{ "{:,.4f}".format(gu_total.val) }}
+              <span class="ml-1 {% if reconciled %}text-green-600{% else %}text-red-600{% endif %}">
+                {% if reconciled %}✓{% else %}≠ {{ "{:,.4f}".format(coj_cons) }}{% endif %}
+              </span>
+            </td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+
+    {# CoJ water invoice summary #}
+    <div class="bg-white rounded-xl border border-gray-200 overflow-hidden self-start">
+      <div class="px-4 py-2 bg-gray-50 border-b border-gray-200 text-xs font-semibold text-gray-500 uppercase tracking-wide">
+        CoJ Water Invoice
+      </div>
+      <table class="w-full text-sm">
+        <tbody class="divide-y divide-gray-50 text-xs font-mono">
+          <tr>
+            <td class="px-4 py-2 text-gray-500 font-sans">Invoice #</td>
+            <td class="px-4 py-2 text-right">{{ water_inv.invoice_number if water_inv else "—" }}</td>
+          </tr>
+          <tr>
+            <td class="px-4 py-2 text-gray-500 font-sans">Consumption (kL)</td>
+            <td class="px-4 py-2 text-right">{{ qty4(water_inv.consumption if water_inv else none) }}</td>
+          </tr>
+          <tr>
+            <td class="px-4 py-2 text-gray-500 font-sans">Total Due</td>
+            <td class="px-4 py-2 text-right font-semibold">{{ zar(water_inv.total_due if water_inv else none) }}</td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+
+  </div>
+
+  {# ── B: STEP COST ALLOCATION ──────────────────────────────────────────── #}
+  {{ section("B — Step Cost Allocation") }}
+  {% if water_steps_grouped %}
+    {% for step_group in water_steps_grouped %}
+      <div class="bg-white rounded-xl border border-gray-200 overflow-hidden max-w-3xl mb-4">
+        <div class="px-4 py-2 bg-gray-50 border-b border-gray-200 text-xs font-semibold text-gray-600">
+          {{ step_group.step_label }}
+          &mdash; Rate: R {{ "{:.6f}".format(step_group.consumers[0].rate|float) }}/kL
+          {% if step_group.consumers[0].rate|float == 0 %}
+            <span class="text-green-600 font-normal ml-2">(free allocation)</span>
+          {% endif %}
+        </div>
+        <table class="w-full text-sm">
+          <thead class="text-xs text-gray-400 border-b border-gray-100">
+            <tr>
+              <th class="px-4 py-2 text-left">Consumer</th>
+              <th class="px-4 py-2 text-right">Adjusted Total (kL)</th>
+              <th class="px-4 py-2 text-right">Allocated (kL)</th>
+              <th class="px-4 py-2 text-right">Cost (incl. VAT)</th>
+            </tr>
+          </thead>
+          <tbody class="divide-y divide-gray-50 font-mono text-xs">
+            {% set vat = calculation.water_vat_factor|float %}
+            {% for row in step_group.consumers %}
+              <tr class="{{ 'bg-teal-50' if row.consumer_label == 'Common Property' }}">
+                <td class="px-4 py-2 text-gray-700 font-sans">{{ row.consumer_label }}</td>
+                <td class="px-4 py-2 text-right text-gray-500">{{ qty4(row.adjusted_usage) }}</td>
+                <td class="px-4 py-2 text-right font-semibold">{{ qty4(row.usage_allocated) }}</td>
+                <td class="px-4 py-2 text-right">{{ zar(row.cost|float * vat if row.cost is not none else none) }}</td>
+              </tr>
+            {% endfor %}
+            <tr class="bg-gray-100 font-semibold text-xs border-t border-gray-200">
+              <td class="px-4 py-2 text-gray-700 font-sans" colspan="2">Step total</td>
+              <td class="px-4 py-2 text-right">{{ "{:,.4f}".format(step_group.total_usage|float) }}</td>
+              <td class="px-4 py-2 text-right">{{ zar(step_group.total_cost|float * vat) }}</td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+    {% endfor %}
+  {% else %}
+    <p class="text-sm text-gray-400 italic">No water step data found.</p>
+  {% endif %}
+
+  {# ── C: FIXED COSTS ───────────────────────────────────────────────────── #}
+  {{ section("C — Fixed Costs") }}
+  <div class="bg-white rounded-xl border border-gray-200 overflow-hidden max-w-md">
+    <div class="px-4 py-2 bg-gray-50 border-b border-gray-200 text-xs font-semibold text-gray-500 uppercase tracking-wide">
+      Water Fixed Charges
+    </div>
+    <table class="w-full text-sm">
+      <tbody class="divide-y divide-gray-50 font-mono text-xs">
+        {% set vat = calculation.water_vat_factor|float %}
+        {% if water_inv %}
+          {% for li in water_inv.line_items %}
+            {% if li.line_type == "fixed" %}
+              {% if li.label.lower().strip() == "sewer charge" %}
+                <tr class="bg-gray-50 text-gray-400">
+                  <td class="px-4 py-2 font-sans">
+                    <span class="line-through">{{ li.label }}</span>
+                    <span class="text-xs font-normal ml-1">(excluded)</span>
+                  </td>
+                  <td class="px-4 py-2 text-right line-through">{{ zar(li.cost|float * vat) }}</td>
+                </tr>
+              {% else %}
+                <tr>
+                  <td class="px-4 py-2 text-gray-600 font-sans">{{ li.label }}</td>
+                  <td class="px-4 py-2 text-right">{{ zar(li.cost|float * vat) }}</td>
+                </tr>
+              {% endif %}
+            {% endif %}
+          {% endfor %}
+        {% endif %}
+        {% if sewer_charge %}
+          <tr class="text-xs text-gray-400 border-t border-gray-100">
+            <td class="px-4 py-1.5 font-sans italic" colspan="2">
+              Sewer excluded: {{ zar(sewer_charge.cost|float * vat) }} (incl. VAT)
+            </td>
+          </tr>
+        {% endif %}
+        <tr class="bg-gray-50 font-semibold border-t border-gray-200">
+          <td class="px-4 py-2 text-gray-700 font-sans">Total billable fixed (incl. VAT)</td>
+          <td class="px-4 py-2 text-right">{{ zar(calculation.water_total_fixed_cost|float * vat) }}</td>
+        </tr>
+        <tr class="bg-indigo-50 font-semibold">
+          <td class="px-4 py-2 text-indigo-700 font-sans">Per unit (÷ 5)</td>
+          <td class="px-4 py-2 text-right text-indigo-700">
+            {% if calculation.unit_allocations %}
+              {{ zar(calculation.unit_allocations[0].water_fixed_share) }}
+            {% else %}—{% endif %}
+          </td>
+        </tr>
+      </tbody>
+    </table>
+  </div>
+
+  {# ── D: COMMON PROPERTY COST SPLIT ────────────────────────────────────── #}
+  {{ section("D — Common Property Variable Cost Split") }}
+  <div class="bg-white rounded-xl border border-gray-200 overflow-hidden max-w-md">
+    <table class="w-full text-sm">
+      <tbody class="divide-y divide-gray-50 font-mono text-sm">
+        <tr>
+          <td class="px-4 py-2 text-gray-600 font-sans">Common property variable cost (incl. VAT)</td>
+          <td class="px-4 py-2 text-right">{{ zar(calculation.water_common_variable_cost) }}</td>
+        </tr>
+        <tr class="bg-indigo-50 font-semibold">
+          <td class="px-4 py-2 text-indigo-700 font-sans">Per unit (÷ 5)</td>
+          <td class="px-4 py-2 text-right text-indigo-700">
+            {% if calculation.unit_allocations %}
+              {{ zar(calculation.unit_allocations[0].water_common_share) }}
+            {% else %}—{% endif %}
+          </td>
+        </tr>
+      </tbody>
+    </table>
+  </div>
+
+  {# ── E: PER-UNIT WATER SUMMARY ────────────────────────────────────────── #}
+  {{ section("E — Per-Unit Water Summary") }}
+  <div class="bg-white rounded-xl border border-gray-200 overflow-hidden">
+    <table class="w-full text-sm">
+      <thead class="text-xs text-gray-400 border-b border-gray-200 bg-gray-50">
+        <tr>
+          <th class="px-4 py-2.5 text-left w-48">Charge</th>
+          {% for alloc in calculation.unit_allocations %}
+            <th class="px-4 py-2.5 text-right">Unit {{ alloc.unit_number }}</th>
+          {% endfor %}
+        </tr>
+      </thead>
+      <tbody class="divide-y divide-gray-100 font-mono text-xs">
+        <tr>
+          <td class="px-4 py-2 text-gray-600 font-sans">Variable</td>
+          {% for alloc in calculation.unit_allocations %}
+            <td class="px-4 py-2 text-right">{{ zar(alloc.water_variable_cost) }}</td>
+          {% endfor %}
+        </tr>
+        <tr>
+          <td class="px-4 py-2 text-gray-600 font-sans">Fixed share</td>
+          {% for alloc in calculation.unit_allocations %}
+            <td class="px-4 py-2 text-right">{{ zar(alloc.water_fixed_share) }}</td>
+          {% endfor %}
+        </tr>
+        <tr>
+          <td class="px-4 py-2 text-gray-600 font-sans">Common share</td>
+          {% for alloc in calculation.unit_allocations %}
+            <td class="px-4 py-2 text-right">{{ zar(alloc.water_common_share) }}</td>
+          {% endfor %}
+        </tr>
+        <tr class="bg-teal-50 font-semibold text-teal-800">
+          <td class="px-4 py-2.5 font-sans">Total Water (incl. VAT)</td>
+          {% for alloc in calculation.unit_allocations %}
+            <td class="px-4 py-2.5 text-right">{{ zar(alloc.total_water) }}</td>
+          {% endfor %}
+        </tr>
+      </tbody>
+    </table>
+  </div>
+
+  {# ── F: RECONCILIATION ────────────────────────────────────────────────── #}
+  {{ section("F — Reconciliation") }}
+  <div class="bg-white rounded-xl border border-gray-200 overflow-hidden max-w-md">
+    <div class="p-4 font-mono text-sm space-y-1.5">
+      <div class="flex justify-between text-gray-600">
+        <span class="font-sans">CoJ water total due</span>
+        <span>{{ zar(water_inv.total_due if water_inv else none) }}</span>
+      </div>
+      {% if sewer_charge %}
+        <div class="flex justify-between text-gray-400 text-xs">
+          <span class="font-sans italic">Less: Sewer charge (incl. VAT)</span>
+          <span>{{ zar(sewer_charge.cost|float * calculation.water_vat_factor|float) }}</span>
+        </div>
+      {% endif %}
+      <div class="flex justify-between text-gray-600 border-t border-gray-100 pt-1.5">
+        <span class="font-sans">Billing target</span>
+        <span>{{ zar(calculation.water_reconciliation_target) }}</span>
+      </div>
+      <div class="flex justify-between text-gray-600">
+        <span class="font-sans">Sum of unit bills</span>
+        <span>{{ zar(calculation.water_units_total) }}</span>
+      </div>
+      <div class="border-t border-gray-100 pt-2 flex justify-between font-semibold {% if calculation.water_reconciled %}text-green-700{% else %}text-red-700{% endif %}">
+        <span class="font-sans">
+          {% if calculation.water_reconciled %}✓ Reconciled{% else %}✗ Discrepancy{% endif %}
+        </span>
+        {% if not calculation.water_reconciled %}
+          <span>{{ zar((calculation.water_units_total|float) - (calculation.water_reconciliation_target|float)) }}</span>
+        {% endif %}
+      </div>
+    </div>
+  </div>
+
+  {# Notes #}
+  {% if calculation.notes %}
+    <div class="mt-4 bg-gray-50 border border-gray-200 rounded-lg px-4 py-3 text-xs text-gray-500 max-w-2xl">
+      <p class="font-semibold text-gray-600 mb-1">Calculation notes</p>
+      {% for line in calculation.notes.split('\n') %}
+        <p>{{ line }}</p>
+      {% endfor %}
+    </div>
+  {% endif %}
+
+  {% endif %}{# end if calculation #}
+
+  {# Back link #}
+  <div class="mt-10 pt-6 border-t border-gray-200">
+    <a href="/utility-billing/{{ billing_year }}/{{ billing_month }}"
+       class="text-sm text-gray-500 hover:text-gray-700">
+      ← Back to overview
+    </a>
+  </div>
+
+</div>
+
+{% endblock %}
