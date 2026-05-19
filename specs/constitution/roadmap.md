@@ -56,7 +56,7 @@ A registry of all 5 units and every person associated with them.
 ---
 
 ## Module 2: Utility Billing
-**Status:** ✅ Complete — broken into sub-modules (2a ✅ → 2b ✅ → 2c ✅)
+**Status:** ✅ Complete — sub-modules 2a ✅ → 2b ✅ → 2c ✅ → 2d ✅
 
 The full utility billing workflow, built incrementally. Each sub-module is a standalone deliverable that feeds into the next.
 
@@ -127,6 +127,24 @@ Calculate per-unit consumption from stored readings, reconcile against the CoJ i
 - Water detail screen: same structure with sewer exclusion shown
 - Recalculate button with confirmation modal
 - Auto-trigger fires when all three inputs (elec invoice, water invoice, meter readings) are present for a billing month
+
+---
+
+### Module 2d: Billing Calculation Report
+**Status:** ✅ Complete  
+**Spec:** `/specs/features/module_2d_billing_report/`
+
+Automatically generate a PDF report of the full billing calculation for each month, stored to disk and linked from the utility billing screen.
+
+**Includes:**
+- PDF generated automatically when all three inputs (electricity invoice, water invoice, meter readings) trigger a calculation, and regenerated on manual recalculate
+- Full workings (two sections — Electricity and Water, each with 5 sub-sections): meter readings, CoJ adjustment, step-by-step tariff allocation, fixed cost split, common property split, per-unit breakdown with inline reconciliation
+- Water section: Step 1 shows Common Property as excluded (0 kL, greyed out) with "(Units 1–5 only)" annotation; sewer charge shown as excluded in fixed costs
+- Stored in `documents/utility_calculations/utility_calculation_{year}_{month:02d}.pdf` — deterministic filename, regeneration overwrites cleanly
+- `pdf_path` and `pdf_generated_at` columns added to `billing_calculations`
+- PDF icon link on billing list page; "Download Report (PDF)" button on billing detail page — both open inline in new tab
+- Graceful degradation if WeasyPrint fails: calculation still saves, UI shows "Report not available"
+- Template at `app/templates/billing/report.html` — standalone HTML with embedded CSS, A4 layout, page-break markers visible on screen
 
 ---
 
@@ -299,3 +317,4 @@ Store and query complex insurance documents via a plain-language chat interface.
 | 2026-05-04 | Module 11 complete: all routes, models, service layer, and templates built; PDFs gitignored; delete modals with cascade warnings; LLM error handling | Barry + Claude |
 | 2026-05-05 | Module 2c complete: billing calculation service, step allocation algorithm, per-unit cost allocations, reconciliation, auto-trigger, list/overview/electricity/water detail screens | Barry + Claude |
 | 2026-05-05 | Module 2c: terminology updated throughout — "gross-up" renamed to "adjustment" (CoJ adjustment factor); DB columns renamed accordingly; full Decimal precision maintained, rounding deferred to display only | Barry + Claude |
+| 2026-05-19 | Module 2d complete: WeasyPrint PDF generation, report_service, pdf_path/pdf_generated_at columns, list page icon, detail page button, report route, test preview removed | Barry + Claude |

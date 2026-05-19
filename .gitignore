@@ -6,3 +6,4 @@ venv/
 .DS_Store
 documents/invoices/*.pdf
 documents/insurance/*.pdf
+documents/utility_calculations/*.pdf

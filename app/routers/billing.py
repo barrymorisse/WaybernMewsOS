@@ -1,18 +1,17 @@
 """
-Routes for Module 2c: Utility Consumption & Allocation.
+Routes for Module 2c/2d: Utility Consumption & Allocation + Billing Report.
 
-GET  /utility-billing                           — list of all billing periods
-GET  /utility-billing/{year}/{month}            — detail page with full workings
-POST /utility-billing/{year}/{month}/recalculate — overwrite existing calculation
+GET  /utility-billing                              — list of all billing periods
+GET  /utility-billing/{year}/{month}               — detail page with full workings
+GET  /utility-billing/{year}/{month}/report        — serve the generated PDF inline
+POST /utility-billing/{year}/{month}/recalculate   — overwrite existing calculation
 """
 
 import calendar
 import os
-from itertools import groupby
 
 from fastapi import APIRouter, Depends, Request
 from fastapi.responses import HTMLResponse
-from fastapi.templating import Jinja2Templates
 from sqlalchemy.orm import Session
 
 from app.database import get_db
@@ -20,6 +19,9 @@ from app.models.billing import BillingCalculation
 from app.models.coj_invoice import CojInvoice
 from app.models.meter_readings import MeterReading
 from app.services import billing_service
+from app.services.report_service import group_steps
+
+from fastapi.templating import Jinja2Templates
 
 router = APIRouter(prefix="/utility-billing", tags=["utility-billing"])
 
@@ -28,6 +30,16 @@ templates = Jinja2Templates(
 )
 
 MONTH_NAMES = list(calendar.month_name)  # ["", "January", "February", ...]
+
+
+def _fmt(value, decimals=2) -> str:
+    """Format a number with space as thousands separator, e.g. 1 234.67."""
+    try:
+        return f"{float(value):,.{decimals}f}".replace(",", " ")
+    except (ValueError, TypeError):
+        return "—"
+
+templates.env.filters["fmt"] = _fmt
 
 
 @router.get("", response_class=HTMLResponse)
@@ -59,13 +71,11 @@ async def billing_detail(
         .first()
     )
 
-    # Load meter readings for the current and previous month
     reading = db.query(MeterReading).filter_by(year=billing_year, month=billing_month).first()
     prev_year  = billing_year if billing_month > 1 else billing_year - 1
     prev_month = billing_month - 1 if billing_month > 1 else 12
     prev_reading = db.query(MeterReading).filter_by(year=prev_year, month=prev_month).first()
 
-    # Load CoJ invoices
     elec_inv  = db.query(CojInvoice).filter_by(
         billing_year=billing_year, billing_month=billing_month, invoice_type="electricity"
     ).first()
@@ -73,7 +83,6 @@ async def billing_detail(
         billing_year=billing_year, billing_month=billing_month, invoice_type="water"
     ).first()
 
-    # Determine what's missing (for "not yet calculated" message)
     missing = []
     if not reading:
         missing.append("meter readings")
@@ -82,16 +91,14 @@ async def billing_detail(
     if not water_inv:
         missing.append("water & sanitation invoice")
 
-    # Group step allocations by invoice_type then step_number for the template
     elec_steps_grouped = []
     water_steps_grouped = []
     if calculation:
         elec_rows  = [r for r in calculation.step_allocations if r.invoice_type == "electricity"]
         water_rows = [r for r in calculation.step_allocations if r.invoice_type == "water"]
-        elec_steps_grouped  = _group_steps(elec_rows)
-        water_steps_grouped = _group_steps(water_rows)
+        elec_steps_grouped  = group_steps(elec_rows)
+        water_steps_grouped = group_steps(water_rows)
 
-    # Identify sewer charge for display in fixed costs section
     sewer_charge = None
     if water_inv:
         for li in water_inv.line_items:
@@ -144,7 +151,7 @@ async def billing_electricity(
     elec_steps_grouped = []
     if calculation:
         elec_rows = [r for r in calculation.step_allocations if r.invoice_type == "electricity"]
-        elec_steps_grouped = _group_steps(elec_rows)
+        elec_steps_grouped = group_steps(elec_rows)
 
     return templates.TemplateResponse(
         request=request,
@@ -188,7 +195,7 @@ async def billing_water(
     sewer_charge = None
     if calculation:
         water_rows = [r for r in calculation.step_allocations if r.invoice_type == "water"]
-        water_steps_grouped = _group_steps(water_rows)
+        water_steps_grouped = group_steps(water_rows)
     if water_inv:
         for li in water_inv.line_items:
             if li.line_type == "fixed" and li.label.lower().strip() == "sewer charge":
@@ -231,6 +238,35 @@ async def recalc_modal(
     )
 
 
+@router.get("/{billing_year}/{billing_month}/report")
+async def billing_report_pdf(
+    billing_year: int,
+    billing_month: int,
+    db: Session = Depends(get_db),
+):
+    """Serve the generated PDF report inline in the browser."""
+    from fastapi.responses import FileResponse, Response
+
+    calculation = (
+        db.query(BillingCalculation)
+        .filter_by(billing_year=billing_year, billing_month=billing_month)
+        .first()
+    )
+
+    if not calculation or not calculation.pdf_path or not os.path.isfile(calculation.pdf_path):
+        return Response(
+            content="<p style='font-family:sans-serif;padding:40px'>Report not yet generated for this billing period.</p>",
+            media_type="text/html",
+            status_code=404,
+        )
+
+    return FileResponse(
+        path=calculation.pdf_path,
+        media_type="application/pdf",
+        headers={"Content-Disposition": "inline"},
+    )
+
+
 @router.post("/{billing_year}/{billing_month}/recalculate", response_class=HTMLResponse)
 async def recalculate(
     billing_year: int,
@@ -238,41 +274,17 @@ async def recalculate(
     request: Request,
     db: Session = Depends(get_db),
 ):
-    """Force a fresh calculation, overwriting any existing result."""
+    """Force a fresh calculation (and regenerate the PDF report), overwriting any existing result."""
     try:
         billing_service.run_calculation(billing_year, billing_month, db)
     except ValueError as e:
-        # Return an error partial — the modal will display this
         return templates.TemplateResponse(
             request=request,
             name="billing/_recalc_error.html",
             context={"error": str(e)},
         )
 
-    # Redirect to the detail page (HTMX will follow the HX-Redirect header)
     from fastapi.responses import Response
     response = Response(status_code=204)
     response.headers["HX-Redirect"] = f"/utility-billing/{billing_year}/{billing_month}"
     return response
-
-
-# ---------------------------------------------------------------------------
-# Private helper
-# ---------------------------------------------------------------------------
-
-def _group_steps(rows: list) -> list[dict]:
-    """
-    Group BillingStepAllocation rows by step_number.
-    Returns a list of dicts: [{step_number, step_label, consumers: [row, ...]}, ...]
-    """
-    groups = []
-    for step_num, step_rows in groupby(rows, key=lambda r: r.step_number):
-        step_rows_list = list(step_rows)
-        groups.append({
-            "step_number": step_num,
-            "step_label":  step_rows_list[0].step_label,
-            "consumers":   step_rows_list,
-            "total_usage": sum(r.usage_allocated or 0 for r in step_rows_list),
-            "total_cost":  sum(r.cost or 0 for r in step_rows_list),
-        })
-    return groups

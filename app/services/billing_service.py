@@ -16,9 +16,11 @@ Precision rules:
     to the cent, preserving reconciliation integrity.
 
 Consumers in the step allocation:
-  There are 6 consumers per invoice type: Unit 1–5 plus Common Property.
-  After step costs are allocated, Common Property's variable cost is split
-  equally across the 5 units.
+  Electricity: 6 consumers (Unit 1–5 plus Common Property) share all steps equally.
+  Water: Common Property is excluded from step 1 (free water) — only Units 1–5 share
+  the free allowance. Common Property enters from step 2 and pays step 2+ rates for
+  its entire consumption. After all step costs are allocated, Common Property's
+  variable cost is split equally across the 5 units.
 """
 
 from collections import defaultdict
@@ -153,7 +155,8 @@ def run_calculation(billing_year: int, billing_month: int, db: Session) -> Billi
     water_steps = [li for li in water_inv.line_items if li.line_type == "step"]
 
     elec_step_rows,  elec_var_costs  = _allocate_steps(elec_steps,  grossed_up, "electricity")
-    water_step_rows, water_var_costs = _allocate_steps(water_steps, grossed_up, "water")
+    water_step_rows, water_var_costs = _allocate_steps(water_steps, grossed_up, "water",
+                                                       exclude_common_from_first_step=True)
 
     # Step 6 — Fixed costs (full precision, sewer excluded from water)
     elec_fixed_items  = [li for li in elec_inv.line_items  if li.line_type == "fixed"]
@@ -294,6 +297,11 @@ def run_calculation(billing_year: int, billing_month: int, db: Session) -> Billi
 
     db.commit()
     db.refresh(calc)
+
+    # Generate PDF report (Module 2d); failure is non-fatal — calculation stands regardless
+    from app.services import report_service
+    report_service.generate_billing_report(billing_year, billing_month, db)
+
     return calc
 
 
@@ -485,9 +493,15 @@ def _allocate_steps(
     step_items: list[CojInvoiceLineItem],
     grossed_up: dict,
     invoice_type: str,
+    exclude_common_from_first_step: bool = False,
 ) -> tuple[list[dict], dict[str, Decimal]]:
     """
-    Step 5: Allocate step kWh/kL equally among 6 consumers, handling exhaustion iteratively.
+    Step 5: Allocate step kWh/kL equally among consumers, handling exhaustion iteratively.
+
+    When exclude_common_from_first_step=True (used for water), Common Property is excluded
+    from step 1 so that only Units 1–5 share the free-water allowance. Common Property
+    enters from step 2 with its full adjusted consumption. Any step 1 budget left unallocated
+    by the five units is carried into step 2 so that all consumption is covered.
 
     All arithmetic is full Decimal precision. Values stored in DB row dicts are also
     full precision — rounding for display is done in templates.
@@ -504,12 +518,26 @@ def _allocate_steps(
 
     remaining_usage: dict[str, Decimal] = dict(consumer_totals)
 
+    # Save Common Property's usage and zero it out before step 1. It will be restored
+    # at the start of step 2 so it pays step 2+ rates for its entire consumption.
+    saved_common: Decimal | None = None
+    if exclude_common_from_first_step and len(step_items) > 1:
+        saved_common = remaining_usage["Common Property"]
+        remaining_usage["Common Property"] = Decimal("0")
+
     step_allocation_rows: list[dict] = []
     variable_costs: dict[str, Decimal] = defaultdict(Decimal)
+    step1_carryover = Decimal("0")
 
     for step_num, step in enumerate(step_items, start=1):
-        step_usage = _to_decimal(step.usage_amount)
-        step_rate  = _to_decimal(step.rate)
+        # Restore Common Property at step 2 and absorb any unallocated step 1 budget.
+        if step_num == 2 and saved_common is not None:
+            remaining_usage["Common Property"] = saved_common
+            step_usage = _to_decimal(step.usage_amount) + step1_carryover
+        else:
+            step_usage = _to_decimal(step.usage_amount)
+
+        step_rate = _to_decimal(step.rate)
 
         active = {c: remaining_usage[c] for c in CONSUMER_LABELS if remaining_usage[c] > 0}
         step_allocations: dict[str, Decimal] = {c: Decimal("0") for c in CONSUMER_LABELS}
@@ -536,12 +564,23 @@ def _allocate_steps(
                     del active[consumer]
 
         step_total_allocated = sum(step_allocations.values())
-        if abs(step_total_allocated - step_usage) > Decimal("0.001"):
-            raise ValueError(
-                f"Step allocation error for {invoice_type} {step.label}: "
-                f"allocated {step_total_allocated} but expected {step_usage}. "
-                "This is an algorithm error — please report it."
-            )
+
+        if saved_common is not None and step_num == 1:
+            # Units may not fill all of step 1 — record the shortfall for step 2.
+            step1_carryover = step_usage - step_total_allocated
+            if step_total_allocated > step_usage + Decimal("0.001"):
+                raise ValueError(
+                    f"Step allocation error for {invoice_type} {step.label}: "
+                    f"allocated {step_total_allocated} but budget was {step_usage}. "
+                    "This is an algorithm error — please report it."
+                )
+        else:
+            if abs(step_total_allocated - step_usage) > Decimal("0.001"):
+                raise ValueError(
+                    f"Step allocation error for {invoice_type} {step.label}: "
+                    f"allocated {step_total_allocated} but expected {step_usage}. "
+                    "This is an algorithm error — please report it."
+                )
 
         for consumer in CONSUMER_LABELS:
             allocated  = step_allocations[consumer]

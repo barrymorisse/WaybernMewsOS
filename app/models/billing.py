@@ -69,6 +69,10 @@ class BillingCalculation(Base):
     # Free-text field for warnings, clamping notes, rounding adjustments
     notes = Column(Text, nullable=True)
 
+    # Module 2d — generated PDF report
+    pdf_path         = Column(String,   nullable=True)
+    pdf_generated_at = Column(DateTime, nullable=True)
+
     # One calculation → many unit allocations and step allocations
     unit_allocations = relationship(
         "UnitBillingAllocation",

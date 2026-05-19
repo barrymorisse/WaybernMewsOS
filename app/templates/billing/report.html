@@ -1,0 +1,594 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <title>Utility Billing Calculation — {{ month_names[billing_month] }} {{ billing_year }}</title>
+  <style>
+    /* ── Reset ─────────────────────────────────────────────── */
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+    /* ── Base ───────────────────────────────────────────────── */
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Helvetica, Arial, sans-serif;
+      font-size: 10.5pt;
+      color: #1e293b;
+      background: white;
+      line-height: 1.5;
+    }
+
+    /* ── Print page setup ───────────────────────────────────── */
+    @page {
+      size: A4;
+      margin: 18mm 20mm 18mm 20mm;
+    }
+
+    /* ── Screen wrapper ─────────────────────────────────────── */
+    @media screen {
+      body { background: #e2e8f0; padding: 24px; }
+      .page { background: white; max-width: 210mm; margin: 0 auto; padding: 20mm; box-shadow: 0 4px 24px rgba(0,0,0,0.12); }
+    }
+    @media print {
+      body { background: white; }
+      .page { padding: 0; }
+    }
+
+    /* ── Page break indicator (screen only) ─────────────────── */
+    .page-break-marker {
+      margin: 32px -20mm 32px -20mm;
+      border-top: 2px dashed #94a3b8;
+      text-align: center;
+    }
+    .page-break-marker span {
+      display: inline-block;
+      background: #e2e8f0;
+      color: #64748b;
+      font-size: 8pt;
+      font-style: italic;
+      letter-spacing: 0.05em;
+      padding: 2px 14px;
+      position: relative;
+      top: -0.8em;
+    }
+    @media print {
+      .page-break-marker { display: none; }
+    }
+
+    /* ── Cover ───────────────────────────────────────────────── */
+    .cover {
+      display: flex;
+      align-items: center;
+      gap: 18px;
+      border-bottom: 3px solid #1d4ed8;
+      padding-bottom: 20px;
+      margin-bottom: 28px;
+    }
+    .cover-logo {
+      width: 56px;
+      height: 56px;
+      border-radius: 10px;
+      flex-shrink: 0;
+    }
+    .cover-text h1 {
+      font-size: 11pt;
+      font-weight: 700;
+      color: #1d4ed8;
+      letter-spacing: 0.01em;
+      margin-bottom: 1px;
+    }
+    .cover-text h2 {
+      font-size: 18pt;
+      font-weight: 700;
+      color: #1e293b;
+      line-height: 1.2;
+      margin-bottom: 2px;
+    }
+    .cover-text .period {
+      font-size: 12pt;
+      color: #475569;
+      font-weight: 500;
+    }
+    .cover-text .generated {
+      font-size: 8pt;
+      color: #94a3b8;
+      margin-top: 4px;
+    }
+
+    /* ── Section headings ────────────────────────────────────── */
+    .section-title {
+      font-size: 13pt;
+      font-weight: 700;
+      color: #1d4ed8;
+      border-bottom: 2px solid #bfdbfe;
+      padding-bottom: 5px;
+      margin-bottom: 18px;
+      margin-top: 32px;
+      page-break-after: avoid;
+    }
+    .section-title:first-of-type { margin-top: 0; }
+
+    .subsection-title {
+      font-size: 9pt;
+      font-weight: 700;
+      text-transform: uppercase;
+      letter-spacing: 0.07em;
+      color: #475569;
+      margin-top: 22px;
+      margin-bottom: 6px;
+      page-break-after: avoid;
+    }
+
+    /* ── Tables ──────────────────────────────────────────────── */
+    table {
+      width: 100%;
+      border-collapse: collapse;
+      font-size: 9.5pt;
+      margin-bottom: 4px;
+      page-break-inside: avoid;
+    }
+    th {
+      background: #f1f5f9;
+      color: #374151;
+      font-weight: 600;
+      text-align: left;
+      padding: 6px 10px;
+      border: 1px solid #cbd5e1;
+      font-size: 8.5pt;
+    }
+    td {
+      padding: 5px 10px;
+      border: 1px solid #e2e8f0;
+      color: #1e293b;
+      vertical-align: top;
+    }
+    tr:nth-child(even) td { background: #f8fafc; }
+
+    .r   { text-align: right; }
+    .c   { text-align: center; }
+    .w40 { width: 40%; }
+    .w50 { width: 50%; }
+    .w60 { width: 60%; }
+
+    tr.total td {
+      font-weight: 700;
+      background: #f1f5f9 !important;
+      border-top: 2px solid #94a3b8;
+    }
+    tr.coj-ref td {
+      background: #eff6ff !important;
+      font-style: italic;
+      color: #1d4ed8;
+      font-size: 9pt;
+      border-top: 1px dashed #93c5fd;
+    }
+    tr.excluded td {
+      color: #94a3b8;
+      font-style: italic;
+      background: #fafafa !important;
+    }
+
+    /* ── Reconciliation badges ───────────────────────────────── */
+    .badge-pass {
+      display: inline-block;
+      background: #dcfce7;
+      color: #15803d;
+      padding: 2px 10px;
+      border-radius: 4px;
+      font-weight: 700;
+      font-size: 9pt;
+    }
+    .badge-fail {
+      display: inline-block;
+      background: #fee2e2;
+      color: #b91c1c;
+      padding: 2px 10px;
+      border-radius: 4px;
+      font-weight: 700;
+      font-size: 9pt;
+    }
+
+    /* ── Page-break hint (PDF) ───────────────────────────────── */
+    .break-before { page-break-before: always; }
+  </style>
+</head>
+<body>
+<div class="page">
+
+{# ════════════════════════════════════════════════════════════════
+   COVER
+   ════════════════════════════════════════════════════════════════ #}
+<div class="cover">
+  <img class="cover-logo" src="/static/app_icon.png" alt="Waybern Mews" />
+  <div class="cover-text">
+    <h1>Waybern Mews Body Corporate</h1>
+    <h2>Utility Billing Calculation</h2>
+    <div class="period">{{ month_names[billing_month] }} {{ billing_year }}</div>
+    <div class="generated">Generated: {{ generated_at.strftime("%d %B %Y at %H:%M") }}</div>
+  </div>
+</div>
+
+
+{# ════════════════════════════════════════════════════════════════
+   SECTION 1 — ELECTRICITY
+   ════════════════════════════════════════════════════════════════ #}
+<h2 class="section-title">Section 1 &mdash; Electricity</h2>
+
+{# 1.1 Meter Readings #}
+<div class="subsection-title">1.1 &nbsp; Meter Readings (kWh)</div>
+<table>
+  <thead>
+    <tr>
+      <th class="w40">Unit</th>
+      <th class="r">Previous Reading</th>
+      <th class="r">Current Reading</th>
+      <th class="r">Raw Consumption</th>
+      <th class="r">Adjusted Consumption</th>
+    </tr>
+  </thead>
+  <tbody>
+    {% for row in elec_reading_rows %}
+    <tr>
+      <td>{{ row.label }}</td>
+      <td class="r">{% if row.prev        is not none %}{{ row.prev        | fmt(1) }}{% else %}&mdash;{% endif %}</td>
+      <td class="r">{% if row.curr        is not none %}{{ row.curr        | fmt(1) }}{% else %}&mdash;{% endif %}</td>
+      <td class="r">{% if row.consumption  is not none %}{{ row.consumption  | fmt }}{% else %}&mdash;{% endif %}</td>
+      <td class="r">{% if row.adjusted    is not none %}{{ row.adjusted     | fmt }}{% else %}&mdash;{% endif %}</td>
+    </tr>
+    {% endfor %}
+    {% if reading and prev_reading and reading.elec_total is not none and prev_reading.elec_total is not none %}
+    {% set elec_raw_total = (reading.elec_total | float) - (prev_reading.elec_total | float) %}
+    <tr class="total">
+      <td>Total</td>
+      <td class="r">{{ prev_reading.elec_total | fmt(1) }}</td>
+      <td class="r">{{ reading.elec_total | fmt(1) }}</td>
+      <td class="r">{{ elec_raw_total | fmt }}</td>
+      <td class="r">{{ (elec_raw_total * (calculation.elec_adjustment_factor | float)) | fmt }}</td>
+    </tr>
+    {% endif %}
+    {% if elec_inv %}
+    <tr class="coj-ref">
+      <td colspan="4">CoJ Consumption</td>
+      <td class="r">{{ elec_inv.consumption | fmt }}</td>
+    </tr>
+    {% endif %}
+  </tbody>
+</table>
+
+{# 1.2 Step Cost Allocation #}
+<div class="subsection-title">1.2 &nbsp; Step Cost Allocation</div>
+
+{% for step in elec_steps_grouped %}
+{% set coj_step = elec_step_items.get(step.step_label) %}
+<p style="font-size:9pt;font-weight:600;margin:14px 0 4px">
+  {{ step.step_label }}
+  &nbsp;&mdash;&nbsp;
+  Rate: R&nbsp;{{ step.consumers[0].rate | fmt(6) }} / kWh
+</p>
+<table>
+  <thead>
+    <tr>
+      <th class="w40">Unit</th>
+      <th class="r">Total Adjusted (kWh)</th>
+      <th class="r">Allocated to Step (kWh)</th>
+      <th class="r">Cost ex-VAT (R)</th>
+    </tr>
+  </thead>
+  <tbody>
+    {% for row in step.consumers %}
+    <tr>
+      <td>{{ row.consumer_label }}</td>
+      <td class="r">{{ row.adjusted_usage | fmt }}</td>
+      <td class="r">{{ row.usage_allocated | fmt }}</td>
+      <td class="r">{{ row.cost | fmt }}</td>
+    </tr>
+    {% endfor %}
+    <tr class="total">
+      <td>Our total</td>
+      <td class="r"></td>
+      <td class="r">{{ step.total_usage | fmt }}</td>
+      <td class="r">{{ step.total_cost | fmt }}</td>
+    </tr>
+    {% if coj_step %}
+    <tr class="coj-ref">
+      <td colspan="2">CoJ Step Total</td>
+      <td class="r">{{ coj_step.usage_amount | fmt }} kWh</td>
+      <td class="r">{{ coj_step.cost | fmt }}</td>
+    </tr>
+    {% endif %}
+  </tbody>
+</table>
+{% endfor %}
+
+{# 1.3 Fixed Charges #}
+<div class="subsection-title">1.3 &nbsp; Fixed Charges</div>
+<table>
+  <thead>
+    <tr>
+      <th class="w60">Charge</th>
+      <th class="r">Amount ex-VAT (R)</th>
+    </tr>
+  </thead>
+  <tbody>
+    {% for item in elec_fixed_items %}
+    {% if item.cost | float != 0 %}
+    <tr>
+      <td>{{ item.label }}</td>
+      <td class="r">{{ item.cost | fmt }}</td>
+    </tr>
+    {% endif %}
+    {% endfor %}
+    <tr class="total">
+      <td>Total fixed cost</td>
+      <td class="r">{{ calculation.elec_total_fixed_cost | fmt }}</td>
+    </tr>
+    <tr>
+      <td>Per unit (&divide; 5)</td>
+      <td class="r">{{ (calculation.elec_total_fixed_cost | float / 5) | fmt }}</td>
+    </tr>
+  </tbody>
+</table>
+
+{# 1.4 Common Property Variable Cost #}
+<div class="subsection-title">1.4 &nbsp; Common Property Variable Cost</div>
+<table>
+  <tbody>
+    <tr>
+      <td class="w60">Common Property total variable cost (VAT-incl)</td>
+      <td class="r">R&nbsp;{{ calculation.elec_common_variable_cost | fmt }}</td>
+    </tr>
+    <tr>
+      <td>Per unit (&divide; 5)</td>
+      <td class="r">R&nbsp;{{ (calculation.elec_common_variable_cost | float / 5) | fmt }}</td>
+    </tr>
+  </tbody>
+</table>
+
+{# 1.5 Per-Unit Electricity Breakdown + reconciliation #}
+<div class="subsection-title">1.5 &nbsp; Per-Unit Electricity Breakdown</div>
+<table>
+  <thead>
+    <tr>
+      <th>Unit</th>
+      <th class="r">Variable Cost</th>
+      <th class="r">Fixed Share</th>
+      <th class="r">Common Share</th>
+      <th class="r">Total Electricity (R)</th>
+    </tr>
+  </thead>
+  <tbody>
+    {% for ua in unit_allocations %}
+    <tr>
+      <td>Unit {{ ua.unit_number }}</td>
+      <td class="r">{{ ua.elec_variable_cost | fmt }}</td>
+      <td class="r">{{ ua.elec_fixed_share   | fmt }}</td>
+      <td class="r">{{ ua.elec_common_share  | fmt }}</td>
+      <td class="r"><strong>{{ ua.total_elec | fmt }}</strong></td>
+    </tr>
+    {% endfor %}
+    <tr class="total">
+      <td>Total billed to units</td>
+      <td class="r"></td>
+      <td class="r"></td>
+      <td class="r"></td>
+      <td class="r">{{ calculation.elec_units_total | fmt }}</td>
+    </tr>
+    <tr class="coj-ref">
+      <td colspan="4">
+        CoJ electricity target (total amount due)
+        &nbsp;
+        {% if calculation.elec_reconciled %}
+        <span class="badge-pass">&#10003; RECONCILED</span>
+        {% else %}
+        <span class="badge-fail">&#10007; MISMATCH</span>
+        {% endif %}
+      </td>
+      <td class="r">{{ calculation.elec_reconciliation_target | fmt }}</td>
+    </tr>
+  </tbody>
+</table>
+
+
+{# ════════════════════════════════════════════════════════════════
+   PAGE BREAK MARKER (screen only)
+   ════════════════════════════════════════════════════════════════ #}
+<div class="page-break-marker break-before"><span>Page Break</span></div>
+
+
+{# ════════════════════════════════════════════════════════════════
+   SECTION 2 — WATER
+   ════════════════════════════════════════════════════════════════ #}
+<h2 class="section-title">Section 2 &mdash; Water</h2>
+
+{# 2.1 Meter Readings #}
+<div class="subsection-title">2.1 &nbsp; Meter Readings (kL)</div>
+<table>
+  <thead>
+    <tr>
+      <th class="w40">Unit</th>
+      <th class="r">Previous Reading</th>
+      <th class="r">Current Reading</th>
+      <th class="r">Raw Consumption</th>
+      <th class="r">Adjusted Consumption</th>
+    </tr>
+  </thead>
+  <tbody>
+    {% for row in water_reading_rows %}
+    <tr>
+      <td>{{ row.label }}</td>
+      <td class="r">{% if row.prev        is not none %}{{ row.prev        | fmt(1) }}{% else %}&mdash;{% endif %}</td>
+      <td class="r">{% if row.curr        is not none %}{{ row.curr        | fmt(1) }}{% else %}&mdash;{% endif %}</td>
+      <td class="r">{% if row.consumption  is not none %}{{ row.consumption  | fmt }}{% else %}&mdash;{% endif %}</td>
+      <td class="r">{% if row.adjusted    is not none %}{{ row.adjusted     | fmt }}{% else %}&mdash;{% endif %}</td>
+    </tr>
+    {% endfor %}
+    {% if reading and prev_reading and reading.water_total is not none and prev_reading.water_total is not none %}
+    {% set water_raw_total = (reading.water_total | float) - (prev_reading.water_total | float) %}
+    <tr class="total">
+      <td>Total</td>
+      <td class="r">{{ prev_reading.water_total | fmt(1) }}</td>
+      <td class="r">{{ reading.water_total | fmt(1) }}</td>
+      <td class="r">{{ water_raw_total | fmt }}</td>
+      <td class="r">{{ (water_raw_total * (calculation.water_adjustment_factor | float)) | fmt }}</td>
+    </tr>
+    {% endif %}
+    {% if water_inv %}
+    <tr class="coj-ref">
+      <td colspan="4">CoJ Consumption</td>
+      <td class="r">{{ water_inv.consumption | fmt }}</td>
+    </tr>
+    {% endif %}
+  </tbody>
+</table>
+{% if sewer_charge %}
+<p style="font-size:8.5pt;color:#64748b;font-style:italic;margin-top:4px">
+  Sewer charge (R&nbsp;{{ sewer_charge.cost | fmt }} ex-VAT) is a bulk account cost excluded from unit billing.
+</p>
+{% endif %}
+
+{# 2.2 Step Cost Allocation #}
+<div class="subsection-title">2.2 &nbsp; Step Cost Allocation</div>
+
+{% for step in water_steps_grouped %}
+{% set coj_step = water_step_items.get(step.step_label) %}
+{% set is_first_step = loop.first %}
+<p style="font-size:9pt;font-weight:600;margin:14px 0 4px">
+  {{ step.step_label }}
+  &nbsp;&mdash;&nbsp;
+  Rate: R&nbsp;{{ step.consumers[0].rate | fmt(6) }} / kL
+  {% if is_first_step %}
+  <span style="color:#059669;font-size:8pt;font-style:italic;font-weight:400">
+    &nbsp;(Units 1&ndash;5 only)
+  </span>
+  {% endif %}
+</p>
+<table>
+  <thead>
+    <tr>
+      <th class="w40">Unit</th>
+      <th class="r">Total Adjusted (kL)</th>
+      <th class="r">Allocated to Step (kL)</th>
+      <th class="r">Cost ex-VAT (R)</th>
+    </tr>
+  </thead>
+  <tbody>
+    {% for row in step.consumers %}
+    <tr{% if is_first_step and row.consumer_label == "Common Property" and row.usage_allocated | float < 0.0001 %} class="excluded"{% endif %}>
+      <td>{{ row.consumer_label }}</td>
+      <td class="r">{{ row.adjusted_usage  | fmt }}</td>
+      <td class="r">{{ row.usage_allocated | fmt }}</td>
+      <td class="r">{{ row.cost            | fmt }}</td>
+    </tr>
+    {% endfor %}
+    <tr class="total">
+      <td>Our total</td>
+      <td class="r"></td>
+      <td class="r">{{ step.total_usage | fmt }}</td>
+      <td class="r">{{ step.total_cost  | fmt }}</td>
+    </tr>
+    {% if coj_step %}
+    <tr class="coj-ref">
+      <td colspan="2">CoJ Step Total</td>
+      <td class="r">{{ coj_step.usage_amount | fmt }} kL</td>
+      <td class="r">{{ coj_step.cost | fmt }}</td>
+    </tr>
+    {% endif %}
+  </tbody>
+</table>
+{% endfor %}
+
+{# 2.3 Fixed Charges #}
+<div class="subsection-title">2.3 &nbsp; Fixed Charges</div>
+<table>
+  <thead>
+    <tr>
+      <th class="w60">Charge</th>
+      <th class="r">Amount ex-VAT (R)</th>
+    </tr>
+  </thead>
+  <tbody>
+    {% for item in water_fixed_items %}
+    {% if item.cost | float != 0 %}
+    <tr>
+      <td>{{ item.label }}</td>
+      <td class="r">{{ item.cost | fmt }}</td>
+    </tr>
+    {% endif %}
+    {% endfor %}
+    {% if sewer_charge %}
+    <tr class="excluded">
+      <td>{{ sewer_charge.label }} <em>(excluded &mdash; bulk account cost)</em></td>
+      <td class="r">{{ sewer_charge.cost | fmt }}</td>
+    </tr>
+    {% endif %}
+    <tr class="total">
+      <td>Billable fixed cost total</td>
+      <td class="r">{{ calculation.water_total_fixed_cost | fmt }}</td>
+    </tr>
+    <tr>
+      <td>Per unit (&divide; 5)</td>
+      <td class="r">{{ (calculation.water_total_fixed_cost | float / 5) | fmt }}</td>
+    </tr>
+  </tbody>
+</table>
+
+{# 2.4 Common Property Variable Cost #}
+<div class="subsection-title">2.4 &nbsp; Common Property Variable Cost</div>
+<table>
+  <tbody>
+    <tr>
+      <td class="w60">Common Property total variable cost (VAT-incl)</td>
+      <td class="r">R&nbsp;{{ calculation.water_common_variable_cost | fmt }}</td>
+    </tr>
+    <tr>
+      <td>Per unit (&divide; 5)</td>
+      <td class="r">R&nbsp;{{ (calculation.water_common_variable_cost | float / 5) | fmt }}</td>
+    </tr>
+  </tbody>
+</table>
+
+{# 2.5 Per-Unit Water Breakdown + reconciliation #}
+<div class="subsection-title">2.5 &nbsp; Per-Unit Water Breakdown</div>
+<table>
+  <thead>
+    <tr>
+      <th>Unit</th>
+      <th class="r">Variable Cost</th>
+      <th class="r">Fixed Share</th>
+      <th class="r">Common Share</th>
+      <th class="r">Total Water (R)</th>
+    </tr>
+  </thead>
+  <tbody>
+    {% for ua in unit_allocations %}
+    <tr>
+      <td>Unit {{ ua.unit_number }}</td>
+      <td class="r">{{ ua.water_variable_cost | fmt }}</td>
+      <td class="r">{{ ua.water_fixed_share   | fmt }}</td>
+      <td class="r">{{ ua.water_common_share  | fmt }}</td>
+      <td class="r"><strong>{{ ua.total_water | fmt }}</strong></td>
+    </tr>
+    {% endfor %}
+    <tr class="total">
+      <td>Total billed to units</td>
+      <td class="r"></td>
+      <td class="r"></td>
+      <td class="r"></td>
+      <td class="r">{{ calculation.water_units_total | fmt }}</td>
+    </tr>
+    <tr class="coj-ref">
+      <td colspan="4">
+        CoJ water target (total due &minus; sewer charge)
+        &nbsp;
+        {% if calculation.water_reconciled %}
+        <span class="badge-pass">&#10003; RECONCILED</span>
+        {% else %}
+        <span class="badge-fail">&#10007; MISMATCH</span>
+        {% endif %}
+      </td>
+      <td class="r">{{ calculation.water_reconciliation_target | fmt }}</td>
+    </tr>
+  </tbody>
+</table>
+
+</div>{# end .page #}
+</body>
+</html>

@@ -81,6 +81,9 @@ def _apply_migrations():
         # VAT scaling factors added to billing_calculations
         ("billing_calculations", "elec_vat_factor",  "NUMERIC(10,6)"),
         ("billing_calculations", "water_vat_factor", "NUMERIC(10,6)"),
+        # Module 2d — PDF report path and generation timestamp
+        ("billing_calculations", "pdf_path",          "VARCHAR"),
+        ("billing_calculations", "pdf_generated_at",  "DATETIME"),
     ]
     # Rename columns: gross-up → adjustment terminology (2026-05)
     rename_columns = [
